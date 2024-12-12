@@ -19,7 +19,7 @@ func ApiKey(client *redis.Client) echo.MiddlewareFunc {
 			ctx := c.Request().Context()
 			apiKey := c.Request().Header.Get("X-API-Key")
 
-			key := fmt.Sprintf("API_KEY:%s", "API_KEY", apiKey)
+			key := fmt.Sprintf("API_KEY:" + apiKey)
 			err := client.HGet(ctx, key, "platform").Err()
 			if err != nil {
 				logger.Context(ctx).Error(ctx, err)
