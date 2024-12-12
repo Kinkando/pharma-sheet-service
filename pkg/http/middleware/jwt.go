@@ -14,8 +14,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const applicationPrefix = "PHARMA_SHEET"
-
 func NewProfileProvider(jwtSecret string, client *redis.Client, skipMethodURLs ...string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -42,7 +40,7 @@ func NewProfileProvider(jwtSecret string, client *redis.Client, skipMethodURLs .
 			ctx = context.WithValue(ctx, profile.ProfileKey, userProfile)
 
 			if client != nil {
-				key := fmt.Sprintf("%s:%s:%s:%s:%s", applicationPrefix, profile.AccessTokenPrefix, userProfile.Role, userProfile.UserID, sessionID)
+				key := fmt.Sprintf("%s:%s:%s:%s:%s", profile.ApplicationPrefix, profile.AccessTokenPrefix, userProfile.Role, userProfile.UserID, sessionID)
 				result, err := client.Exists(ctx, key).Result()
 				if err != nil || result == 0 {
 					return c.JSON(http.StatusUnauthorized, echo.Map{"error": "access token is not found"})

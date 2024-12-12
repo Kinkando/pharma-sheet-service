@@ -11,6 +11,7 @@ const (
 	Access  TokenType = "access"
 	Refresh TokenType = "refresh"
 
+	ApplicationPrefix  = "PHARMA_SHEET"
 	AccessTokenPrefix  = "ACCESS_TOKEN"
 	RefreshTokenPrefix = "REFRESH_TOKEN"
 )
