@@ -45,7 +45,7 @@ type storage struct {
 	expireTime time.Duration
 }
 
-func NewStorage(credential []byte, bucketName string, expireTime time.Duration) (Storage, error) {
+func NewStorage(credential []byte, bucketName string, expireTime time.Duration) Storage {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -53,12 +53,12 @@ func NewStorage(credential []byte, bucketName string, expireTime time.Duration) 
 
 	client, err := cloudStorage.NewClient(ctx, option.WithCredentialsJSON(credential))
 	if err != nil {
-		return nil, err
+		logger.Fatal(err)
 	}
 
 	conf, err := google.JWTConfigFromJSON(credential)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load jwt config from json credential: %+v", err)
+		logger.Fatalf("unable to load jwt config from json credential: %+v", err)
 	}
 
 	logger.Info("cloud storage: connected")
@@ -69,7 +69,7 @@ func NewStorage(credential []byte, bucketName string, expireTime time.Duration) 
 		config:     conf,
 		bucketName: bucketName,
 		expireTime: expireTime,
-	}, nil
+	}
 }
 
 func (s *storage) UploadFileByte(fileByte []byte, pathFileName string, contentType string) error {
