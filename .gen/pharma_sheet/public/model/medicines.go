@@ -22,6 +22,7 @@ type Medicines struct {
 	Description string
 	MedicalName string
 	Label       string
+	ImageURL    string
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
 }

@@ -49,6 +49,7 @@ CREATE TABLE medicines (
   description text NOT NULL,
   medical_name text NOT NULL,
   label text NOT NULL,
+  image_url text NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
   CONSTRAINT fk_medicine_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id),

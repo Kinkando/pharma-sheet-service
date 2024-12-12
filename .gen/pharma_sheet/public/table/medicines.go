@@ -26,6 +26,7 @@ type medicinesTable struct {
 	Description postgres.ColumnString
 	MedicalName postgres.ColumnString
 	Label       postgres.ColumnString
+	ImageURL    postgres.ColumnString
 	CreatedAt   postgres.ColumnTimestampz
 	UpdatedAt   postgres.ColumnTimestampz
 
@@ -77,10 +78,11 @@ func newMedicinesTableImpl(schemaName, tableName, alias string) medicinesTable {
 		DescriptionColumn = postgres.StringColumn("description")
 		MedicalNameColumn = postgres.StringColumn("medical_name")
 		LabelColumn       = postgres.StringColumn("label")
+		ImageURLColumn    = postgres.StringColumn("image_url")
 		CreatedAtColumn   = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn   = postgres.TimestampzColumn("updated_at")
-		allColumns        = postgres.ColumnList{MedicineIDColumn, WarehouseIDColumn, LockerIDColumn, FloorColumn, NoColumn, AddressColumn, DescriptionColumn, MedicalNameColumn, LabelColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns    = postgres.ColumnList{WarehouseIDColumn, LockerIDColumn, FloorColumn, NoColumn, AddressColumn, DescriptionColumn, MedicalNameColumn, LabelColumn, CreatedAtColumn, UpdatedAtColumn}
+		allColumns        = postgres.ColumnList{MedicineIDColumn, WarehouseIDColumn, LockerIDColumn, FloorColumn, NoColumn, AddressColumn, DescriptionColumn, MedicalNameColumn, LabelColumn, ImageURLColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns    = postgres.ColumnList{WarehouseIDColumn, LockerIDColumn, FloorColumn, NoColumn, AddressColumn, DescriptionColumn, MedicalNameColumn, LabelColumn, ImageURLColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return medicinesTable{
@@ -96,6 +98,7 @@ func newMedicinesTableImpl(schemaName, tableName, alias string) medicinesTable {
 		Description: DescriptionColumn,
 		MedicalName: MedicalNameColumn,
 		Label:       LabelColumn,
+		ImageURL:    ImageURLColumn,
 		CreatedAt:   CreatedAtColumn,
 		UpdatedAt:   UpdatedAtColumn,
 
