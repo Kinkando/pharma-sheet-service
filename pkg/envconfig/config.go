@@ -6,10 +6,10 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-func Parse[T any](cfg T) error {
+func Parse(cfg any) error {
 	if err := godotenv.Load(); err != nil {
 		log.Warnf("unable to load configuration: %+v", err)
 	}
 
-	return env.Parse(&cfg)
+	return env.Parse(cfg)
 }
