@@ -16,11 +16,18 @@ import (
 
 const applicationPrefix = "PHARMA_SHEET"
 
-func NewProfileProvider(jwtSecret string, client *redis.Client) echo.MiddlewareFunc {
+func NewProfileProvider(jwtSecret string, client *redis.Client, skipMethodURLs ...string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			req := c.Request()
 			ctx := req.Context()
+
+			for _, skipMethodURL := range skipMethodURLs {
+				methodURL := req.Method + " " + req.URL.Path
+				if skipMethodURL == methodURL {
+					return next(c)
+				}
+			}
 
 			authHeader := req.Header.Get(echo.HeaderAuthorization)
 			m1 := regexp.MustCompile(`^Bearer `)
