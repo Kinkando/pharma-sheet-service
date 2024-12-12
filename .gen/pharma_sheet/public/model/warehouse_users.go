@@ -15,5 +15,7 @@ import (
 type WarehouseUsers struct {
 	WarehouseID uuid.UUID
 	UserID      uuid.UUID
+	Role        Role
 	CreatedAt   time.Time
+	UpdatedAt   *time.Time
 }

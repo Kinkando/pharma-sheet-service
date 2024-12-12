@@ -19,7 +19,9 @@ type warehouseUsersTable struct {
 	// Columns
 	WarehouseID postgres.ColumnString
 	UserID      postgres.ColumnString
+	Role        postgres.ColumnString
 	CreatedAt   postgres.ColumnTimestampz
+	UpdatedAt   postgres.ColumnTimestampz
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -62,9 +64,11 @@ func newWarehouseUsersTableImpl(schemaName, tableName, alias string) warehouseUs
 	var (
 		WarehouseIDColumn = postgres.StringColumn("warehouse_id")
 		UserIDColumn      = postgres.StringColumn("user_id")
+		RoleColumn        = postgres.StringColumn("role")
 		CreatedAtColumn   = postgres.TimestampzColumn("created_at")
-		allColumns        = postgres.ColumnList{WarehouseIDColumn, UserIDColumn, CreatedAtColumn}
-		mutableColumns    = postgres.ColumnList{WarehouseIDColumn, UserIDColumn, CreatedAtColumn}
+		UpdatedAtColumn   = postgres.TimestampzColumn("updated_at")
+		allColumns        = postgres.ColumnList{WarehouseIDColumn, UserIDColumn, RoleColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns    = postgres.ColumnList{WarehouseIDColumn, UserIDColumn, RoleColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return warehouseUsersTable{
@@ -73,7 +77,9 @@ func newWarehouseUsersTableImpl(schemaName, tableName, alias string) warehouseUs
 		//Columns
 		WarehouseID: WarehouseIDColumn,
 		UserID:      UserIDColumn,
+		Role:        RoleColumn,
 		CreatedAt:   CreatedAtColumn,
+		UpdatedAt:   UpdatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

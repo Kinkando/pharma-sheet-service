@@ -1,13 +1,13 @@
 -- migrate:up
 CREATE TYPE role AS ENUM (
   'ADMIN',
-  'USER'
+  'EDITOR',
+  'VIEWER'
 );
 
 CREATE TABLE users (
   user_id UUID PRIMARY KEY,
   firebase_uid text UNIQUE NOT NULL,
-  role role NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ
 );
@@ -22,7 +22,9 @@ CREATE TABLE warehouses (
 CREATE TABLE warehouse_users (
   warehouse_id UUID NOT NULL,
   user_id UUID NOT NULL,
+  role role NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ,
   CONSTRAINT fk_warehouse_user_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id),
   CONSTRAINT fk_warehouse_user_user_id FOREIGN KEY (user_id) REFERENCES users (user_id),
   CONSTRAINT unique_warehouse_user UNIQUE (warehouse_id, user_id)
