@@ -129,7 +129,7 @@ func New(options ...Option) *pgxpool.Pool {
 		logger.Fatalf("postgresql: ping: %s", err.Error())
 	}
 
-	logger.Infof("postgresql: connected to %s:%d/%s", pgsql.host, pgsql.port, pgsql.dbName)
+	logger.Infof("postgresql: connected to %s", pgURL)
 	return pgPool
 }
 
