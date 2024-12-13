@@ -53,13 +53,13 @@ func main() {
 		httpserver.WithPort(cfg.App.Port),
 		httpserver.WithMiddlewares([]echo.MiddlewareFunc{
 			httpmiddleware.RequestID,
-			httpmiddleware.NewProfileProvider(
-				cfg.App.JWTKey,
-				redisClient,
-				"POST /auth/token/verify",
-				"POST /auth/token/refresh",
-				"POST /auth/token/revoke",
-			),
+			// httpmiddleware.NewProfileProvider(
+			// 	cfg.App.JWTKey,
+			// 	redisClient,
+			// 	"POST /auth/token/verify",
+			// 	"POST /auth/token/refresh",
+			// 	"POST /auth/token/revoke",
+			// ),
 		}),
 	)
 
