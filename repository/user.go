@@ -6,9 +6,9 @@ import (
 
 	"github.com/go-jet/jet/v2/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/kinkando/pharma-sheet/.gen/pharma_sheet/public/model"
-	"github.com/kinkando/pharma-sheet/.gen/pharma_sheet/public/table"
-	"github.com/kinkando/pharma-sheet/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/table"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 )
 
 type User interface {

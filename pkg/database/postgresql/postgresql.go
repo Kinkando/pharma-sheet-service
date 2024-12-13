@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kinkando/pharma-sheet/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -3,7 +3,7 @@ package httpmiddleware
 import (
 	"net/http"
 
-	"github.com/kinkando/pharma-sheet/pkg/profile"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/labstack/echo/v4"
 )
 

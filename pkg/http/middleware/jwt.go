@@ -8,7 +8,7 @@ import (
 	"regexp"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/kinkando/pharma-sheet/pkg/profile"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/labstack/echo/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/redis/go-redis/v9"

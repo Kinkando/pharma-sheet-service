@@ -10,8 +10,8 @@ import (
 	"time"
 
 	cloudStorage "cloud.google.com/go/storage"
-	"github.com/kinkando/pharma-sheet/pkg/generator"
-	"github.com/kinkando/pharma-sheet/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/generator"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
 	"google.golang.org/api/iterator"

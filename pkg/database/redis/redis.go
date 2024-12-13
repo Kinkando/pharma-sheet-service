@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/kinkando/pharma-sheet/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	goredis "github.com/redis/go-redis/v9"
 )
 

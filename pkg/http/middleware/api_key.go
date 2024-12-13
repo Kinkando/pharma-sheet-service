@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kinkando/pharma-sheet/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
 )

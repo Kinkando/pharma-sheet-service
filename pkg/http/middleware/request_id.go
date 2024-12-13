@@ -3,7 +3,7 @@ package httpmiddleware
 import (
 	"context"
 
-	"github.com/kinkando/pharma-sheet/pkg/generator"
+	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/labstack/echo/v4"
 )
 

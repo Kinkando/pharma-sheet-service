@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/kinkando/pharma-sheet/pkg/generator"
-	"github.com/kinkando/pharma-sheet/pkg/profile"
+	"github.com/kinkando/pharma-sheet-service/pkg/generator"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/mitchellh/mapstructure"
 )
 

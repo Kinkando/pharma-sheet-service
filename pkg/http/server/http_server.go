@@ -15,7 +15,7 @@ import (
 	"time"
 
 	validatorv10 "github.com/go-playground/validator/v10"
-	"github.com/kinkando/pharma-sheet/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"

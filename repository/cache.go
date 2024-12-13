@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kinkando/pharma-sheet/pkg/logger"
-	"github.com/kinkando/pharma-sheet/pkg/profile"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	goredis "github.com/redis/go-redis/v9"
 )
 

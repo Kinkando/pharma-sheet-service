@@ -1,4 +1,4 @@
-module github.com/kinkando/pharma-sheet
+module github.com/kinkando/pharma-sheet-service
 
 go 1.23.0
 
