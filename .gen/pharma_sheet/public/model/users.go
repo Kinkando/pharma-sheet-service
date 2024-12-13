@@ -15,7 +15,7 @@ import (
 type Users struct {
 	UserID      uuid.UUID `sql:"primary_key"`
 	FirebaseUID string
-	PhoneNumber string
+	Email       string
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
 }

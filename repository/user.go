@@ -33,14 +33,16 @@ func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.User
 		condition = users.UserID.EQ(postgres.String(filter.UserID.String()))
 	} else if filter.FirebaseUID != "" {
 		condition = users.FirebaseUID.EQ(postgres.String(filter.FirebaseUID))
+	} else if filter.Email != "" {
+		condition = users.Email.EQ(postgres.String(filter.Email))
 	} else {
 		err = errors.New("filter must be provided")
 		logger.Context(ctx).Error(err)
 		return
 	}
 
-	query, args := users.SELECT(users.UserID, users.FirebaseUID, users.PhoneNumber).WHERE(condition).Sql()
-	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&user.UserID, &user.FirebaseUID, &user.PhoneNumber)
+	query, args := users.SELECT(users.UserID, users.FirebaseUID, users.Email).WHERE(condition).Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&user.UserID, &user.FirebaseUID, &user.Email)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return
