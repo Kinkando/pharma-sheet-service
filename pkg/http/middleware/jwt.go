@@ -40,7 +40,7 @@ func NewProfileProvider(jwtSecret string, client *redis.Client, skipMethodURLs .
 			ctx = context.WithValue(ctx, profile.ProfileKey, userProfile)
 
 			if client != nil {
-				key := fmt.Sprintf("%s:%s:%s:%s:%s", profile.ApplicationPrefix, profile.AccessTokenPrefix, userProfile.Role, userProfile.UserID, sessionID)
+				key := fmt.Sprintf("%s:%s:%s:%s", profile.ApplicationPrefix, profile.AccessTokenPrefix, userProfile.UserID, sessionID)
 				result, err := client.Exists(ctx, key).Result()
 				if err != nil || result == 0 {
 					return c.JSON(http.StatusUnauthorized, echo.Map{"error": "access token is not found"})
@@ -87,7 +87,6 @@ func extractProfileFromJWT(tokenString string, jwtSecret string) (profile.Profil
 
 	profile := profile.Profile{
 		UserID: accessToken.UserID,
-		Role:   accessToken.Role,
 	}
 	return profile, accessToken.SessionID, nil
 }

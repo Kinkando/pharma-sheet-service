@@ -31,7 +31,7 @@ func NewCacheRepository(client *goredis.Client, accessTokenExpireTime, refreshTo
 }
 
 func (tr *cache) CreateAccessToken(ctx context.Context, accessToken profile.AccessToken) error {
-	key := fmt.Sprintf("%s:%s:%s:%s:%s", profile.ApplicationPrefix, profile.AccessTokenPrefix, accessToken.Role, accessToken.UserID, accessToken.SessionID)
+	key := fmt.Sprintf("%s:%s:%s:%s", profile.ApplicationPrefix, profile.AccessTokenPrefix, accessToken.UserID, accessToken.SessionID)
 	value := fmt.Sprintf("%d:%d", accessToken.IssuedAt, accessToken.ExpiresAt)
 	err := tr.db.Set(ctx, key, value, tr.accessTokenExpireTime).Err()
 	if err != nil {
@@ -42,7 +42,7 @@ func (tr *cache) CreateAccessToken(ctx context.Context, accessToken profile.Acce
 }
 
 func (tr *cache) CreateRefreshToken(ctx context.Context, refreshToken profile.RefreshToken) error {
-	key := fmt.Sprintf("%s:%s:%s:%s:%s", profile.ApplicationPrefix, profile.RefreshTokenPrefix, refreshToken.Role, refreshToken.UserID, refreshToken.SessionID)
+	key := fmt.Sprintf("%s:%s:%s:%s", profile.ApplicationPrefix, profile.RefreshTokenPrefix, refreshToken.UserID, refreshToken.SessionID)
 	value := fmt.Sprintf("%d:%d", refreshToken.IssuedAt, refreshToken.ExpiresAt)
 	err := tr.db.Set(ctx, key, value, tr.refreshTokenExpireTime).Err()
 	if err != nil {
@@ -57,7 +57,7 @@ func (tr *cache) DeleteToken(ctx context.Context, userID, sessionID, role string
 	if tokenType == profile.Refresh {
 		prefix = profile.RefreshTokenPrefix
 	}
-	key := fmt.Sprintf("%s:%s:%s:%s:%s", profile.ApplicationPrefix, prefix, role, userID, sessionID)
+	key := fmt.Sprintf("%s:%s:%s:%s", profile.ApplicationPrefix, prefix, userID, sessionID)
 	_, err := tr.db.Del(ctx, key).Result()
 	if err != nil {
 		logger.Context(ctx).Error(err)

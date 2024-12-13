@@ -20,7 +20,6 @@ type AccessToken struct {
 	jwt.StandardClaims
 	UserID    string    `json:"userID"`
 	SessionID string    `json:"sessionID"`
-	Role      Role      `json:"role"`
 	Type      TokenType `json:"type"`
 }
 
@@ -28,6 +27,5 @@ type RefreshToken struct {
 	jwt.StandardClaims
 	UserID    string    `json:"userID"`
 	SessionID string    `json:"sessionID"`
-	Role      Role      `json:"role"`
 	Type      TokenType `json:"type"`
 }

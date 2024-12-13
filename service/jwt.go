@@ -12,7 +12,7 @@ import (
 )
 
 type JWTService interface {
-	EncodeJWT(ctx context.Context, userID string, role profile.Role) (accessTokenClaim profile.AccessToken, refreshTokenClaim profile.RefreshToken, err error)
+	EncodeJWT(ctx context.Context, userID string) (accessTokenClaim profile.AccessToken, refreshTokenClaim profile.RefreshToken, err error)
 	SignedJWT(ctx context.Context, jwtClaim jwt.Claims) (token string, err error)
 	DecodeAccessToken(ctx context.Context, token string) (accessToken profile.AccessToken, err error)
 	DecodeRefreshToken(ctx context.Context, token string) (refreshToken profile.RefreshToken, err error)
@@ -32,7 +32,7 @@ func NewJWTService(jwtSecretKey string, accessTokenExpireTime, refreshTokenExpir
 	}
 }
 
-func (s *jwtService) EncodeJWT(ctx context.Context, userID string, role profile.Role) (accessTokenClaim profile.AccessToken, refreshTokenClaim profile.RefreshToken, err error) {
+func (s *jwtService) EncodeJWT(ctx context.Context, userID string) (accessTokenClaim profile.AccessToken, refreshTokenClaim profile.RefreshToken, err error) {
 	now := time.Now()
 	sessionID := generator.UUID()
 
@@ -43,7 +43,6 @@ func (s *jwtService) EncodeJWT(ctx context.Context, userID string, role profile.
 		},
 		UserID:    userID,
 		SessionID: sessionID,
-		Role:      role,
 		Type:      profile.Access,
 	}
 
@@ -54,7 +53,6 @@ func (s *jwtService) EncodeJWT(ctx context.Context, userID string, role profile.
 		},
 		UserID:    userID,
 		SessionID: sessionID,
-		Role:      role,
 		Type:      profile.Refresh,
 	}
 	return
