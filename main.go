@@ -5,7 +5,9 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/kinkando/pharma-sheet-service/config"
+	"github.com/kinkando/pharma-sheet-service/http"
 	"github.com/kinkando/pharma-sheet-service/pkg/database/postgresql"
 	"github.com/kinkando/pharma-sheet-service/pkg/database/redis"
 	"github.com/kinkando/pharma-sheet-service/pkg/envconfig"
@@ -13,6 +15,8 @@ import (
 	httpmiddleware "github.com/kinkando/pharma-sheet-service/pkg/http/middleware"
 	httpserver "github.com/kinkando/pharma-sheet-service/pkg/http/server"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/repository"
+	"github.com/kinkando/pharma-sheet-service/service"
 	"github.com/labstack/echo/v4"
 )
 
@@ -49,19 +53,34 @@ func main() {
 	cloudStorage := google.NewStorage([]byte(cfg.Google.FirebaseCredential), cfg.Google.Storage.BucketName, cfg.Google.Storage.ExpiredTime)
 	defer cloudStorage.Shutdown()
 
+	firebaseAuthen := google.NewFirebaseAuthen([]byte(cfg.Google.FirebaseCredential))
+
+	validate := validator.New()
+
 	httpServer := httpserver.New(
 		httpserver.WithPort(cfg.App.Port),
 		httpserver.WithMiddlewares([]echo.MiddlewareFunc{
 			httpmiddleware.RequestID,
-			// httpmiddleware.NewProfileProvider(
-			// 	cfg.App.JWTKey,
-			// 	redisClient,
-			// 	"POST /auth/token/verify",
-			// 	"POST /auth/token/refresh",
-			// 	"POST /auth/token/revoke",
-			// ),
+			httpmiddleware.NewProfileProvider(
+				cfg.App.JWTKey,
+				redisClient,
+				"OPTION /",
+				"HEAD /",
+				"GET /livez",
+				"GET /readyz",
+				"POST /auth/token/verify",
+				"POST /auth/token/refresh",
+			),
 		}),
 	)
+
+	userRepository := repository.NewUserRepository(pgPool)
+	cacheRepository := repository.NewCacheRepository(redisClient, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
+
+	jwtService := service.NewJWTService(cfg.App.JWTKey, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
+	authenService := service.NewAuthenService(userRepository, cacheRepository, jwtService, firebaseAuthen)
+
+	http.NewAuthenHandler(httpServer.Routers(), validate, cfg.App.APIKey, authenService)
 
 	httpServer.ListenAndServe()
 	httpServer.GracefulShutdown()

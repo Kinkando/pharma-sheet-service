@@ -5,14 +5,17 @@ import (
 	"errors"
 
 	"github.com/go-jet/jet/v2/postgres"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/table"
+	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 )
 
 type User interface {
 	GetUser(ctx context.Context, user model.Users) (model.Users, error)
+	CreateUser(ctx context.Context, user model.Users) (string, error)
 }
 
 type user struct {
@@ -29,8 +32,8 @@ func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.User
 	users := table.Users
 
 	var condition postgres.BoolExpression
-	if filter.UserID.String() != "" {
-		condition = users.UserID.EQ(postgres.String(filter.UserID.String()))
+	if filter.UserID != uuid.Nil {
+		condition = users.UserID.EQ(postgres.UUID(filter.UserID))
 	} else if filter.FirebaseUID != "" {
 		condition = users.FirebaseUID.EQ(postgres.String(filter.FirebaseUID))
 	} else if filter.Email != "" {
@@ -49,4 +52,19 @@ func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.User
 	}
 
 	return user, nil
+}
+
+func (r *user) CreateUser(ctx context.Context, user model.Users) (string, error) {
+	users := table.Users
+
+	user.UserID = uuid.MustParse(generator.UUID())
+
+	sql, args := users.INSERT(users.UserID, users.FirebaseUID, users.Email, users.CreatedAt).MODEL(user).Sql()
+	_, err := r.pgPool.Exec(ctx, sql, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return "", err
+	}
+
+	return user.UserID.String(), nil
 }
