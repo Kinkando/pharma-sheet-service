@@ -5,13 +5,14 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	"github.com/kinkando/pharma-sheet/config"
-	"github.com/kinkando/pharma-sheet/pkg/database/postgresql"
-	"github.com/kinkando/pharma-sheet/pkg/database/redis"
-	"github.com/kinkando/pharma-sheet/pkg/envconfig"
-	httpmiddleware "github.com/kinkando/pharma-sheet/pkg/http/middleware"
-	httpserver "github.com/kinkando/pharma-sheet/pkg/http/server"
-	"github.com/kinkando/pharma-sheet/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/config"
+	"github.com/kinkando/pharma-sheet-service/pkg/database/postgresql"
+	"github.com/kinkando/pharma-sheet-service/pkg/database/redis"
+	"github.com/kinkando/pharma-sheet-service/pkg/envconfig"
+	"github.com/kinkando/pharma-sheet-service/pkg/google"
+	httpmiddleware "github.com/kinkando/pharma-sheet-service/pkg/http/middleware"
+	httpserver "github.com/kinkando/pharma-sheet-service/pkg/http/server"
+	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
 
@@ -44,6 +45,9 @@ func main() {
 		postgresql.WithMaxIdleConns(cfg.PostgreSQL.MaxIdleConns),
 	)
 	defer postgresql.Shutdown(pgPool)
+
+	cloudStorage := google.NewStorage([]byte(cfg.Google.FirebaseCredential), cfg.Google.Storage.BucketName, cfg.Google.Storage.ExpiredTime)
+	defer cloudStorage.Shutdown()
 
 	httpServer := httpserver.New(
 		httpserver.WithPort(cfg.App.Port),
