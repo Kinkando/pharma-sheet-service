@@ -39,8 +39,8 @@ func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.User
 		return
 	}
 
-	query, args := users.SELECT(users.UserID, users.FirebaseUID).WHERE(condition).Sql()
-	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&user.UserID, &user.FirebaseUID)
+	query, args := users.SELECT(users.UserID, users.FirebaseUID, users.PhoneNumber).WHERE(condition).Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&user.UserID, &user.FirebaseUID, &user.PhoneNumber)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return
