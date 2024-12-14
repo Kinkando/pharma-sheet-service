@@ -4,8 +4,3 @@
 
 # Local script
 Makefile
-
-# Unused database schema
-.gen/pharma_sheet/public/view
-.gen/pharma_sheet/public/model/schema_migrations.go
-.gen/pharma_sheet/public/table/schema_migrations.go
