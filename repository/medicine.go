@@ -241,7 +241,10 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 		postgres.TimestampzT(time.Now()),
 	}
 
-	if req.ImageURL != nil {
+	if req.ImageURL != nil && *req.ImageURL == "null" {
+		columnNames = append(columnNames, medicines.ImageURL)
+		columnValues = append(columnValues, postgres.NULL)
+	} else if req.ImageURL != nil {
 		columnNames = append(columnNames, medicines.ImageURL)
 		columnValues = append(columnValues, postgres.String(*req.ImageURL))
 	}

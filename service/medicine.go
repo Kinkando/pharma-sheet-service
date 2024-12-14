@@ -151,6 +151,10 @@ func (s *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 		if err != nil {
 			logger.Context(ctx).Warn(err)
 		}
+		if req.ImageURL == nil {
+			imageURL := "null"
+			req.ImageURL = &imageURL
+		}
 	}
 
 	err = s.medicineRepository.UpdateMedicine(ctx, req)
