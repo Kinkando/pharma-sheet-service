@@ -86,6 +86,7 @@ func main() {
 	warehouseService := service.NewWarehouseService(warehouseRepository, lockerRepository)
 	medicineService := service.NewMedicineService(medicineRepository, warehouseRepository, cloudStorage)
 
+	http.NewHealthzHandler(httpServer.Routers(), pgPool, redisClient)
 	http.NewAuthenHandler(httpServer.Routers(), validate, cfg.App.APIKey, authenService)
 	http.NewUserHandler(httpServer.Routers(), validate, userService)
 	http.NewWarehouseHandler(httpServer.Routers(), validate, warehouseService)
