@@ -15,7 +15,7 @@ CREATE TABLE users (
 
 CREATE TABLE warehouses (
   warehouse_id UUID PRIMARY KEY,
-  name text NOT NULL,
+  name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ
 );
@@ -34,7 +34,7 @@ CREATE TABLE warehouse_users (
 CREATE TABLE lockers (
   locker_id UUID PRIMARY KEY,
   warehouse_id UUID,
-  name text NOT NULL,
+  name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
   CONSTRAINT fk_locker_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id)
@@ -44,13 +44,13 @@ CREATE TABLE medicines (
   medicine_id UUID PRIMARY KEY,
   warehouse_id UUID NOT NULL,
   locker_id UUID NOT NULL,
-  floor int NOT NULL,
-  no int NOT NULL,
-  address text NOT NULL,
-  description text NOT NULL,
-  medical_name text NOT NULL,
-  label text NOT NULL,
-  image_url text NOT NULL,
+  floor INT NOT NULL,
+  no INT NOT NULL,
+  address TEXT NOT NULL,
+  description TEXT NOT NULL,
+  medical_name TEXT NOT NULL,
+  label TEXT NOT NULL,
+  image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
   CONSTRAINT fk_medicine_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id),
