@@ -58,9 +58,11 @@ func (r *medicine) GetMedicineRole(ctx context.Context, medicineID string) (role
 func (r *medicine) GetMedicine(ctx context.Context, medicineID string) (medicine model.Medicine, err error) {
 	medicines := table.Medicines
 	query, args := medicines.
+		LEFT_JOIN(table.Lockers, medicines.LockerID.EQ(table.Lockers.LockerID)).
 		SELECT(
 			medicines.MedicineID,
 			medicines.LockerID,
+			table.Lockers.Name,
 			medicines.Floor,
 			medicines.No,
 			medicines.Address,
@@ -75,6 +77,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicineID string) (medicine
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(
 		&medicine.MedicineID,
 		&medicine.LockerID,
+		&medicine.LockerName,
 		&medicine.Floor,
 		&medicine.No,
 		&medicine.Address,
@@ -121,9 +124,11 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 	}
 
 	query, args = medicines.
+		LEFT_JOIN(table.Lockers, medicines.LockerID.EQ(table.Lockers.LockerID)).
 		SELECT(
 			medicines.MedicineID,
 			medicines.LockerID,
+			table.Lockers.Name,
 			medicines.Floor,
 			medicines.No,
 			medicines.Address,
@@ -150,6 +155,7 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 		err = rows.Scan(
 			&medicine.MedicineID,
 			&medicine.LockerID,
+			&medicine.LockerName,
 			&medicine.Floor,
 			&medicine.No,
 			&medicine.Address,

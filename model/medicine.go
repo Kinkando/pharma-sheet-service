@@ -5,6 +5,7 @@ import "mime/multipart"
 type Medicine struct {
 	MedicineID  string  `json:"medicineID"`
 	LockerID    string  `json:"lockerID"`
+	LockerName  string  `json:"lockerName"`
 	Floor       int32   `json:"floor"`
 	No          int32   `json:"no"`
 	Address     string  `json:"address"`
