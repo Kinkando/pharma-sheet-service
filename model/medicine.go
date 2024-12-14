@@ -25,8 +25,8 @@ type FilterMedicine struct {
 type CreateMedicineRequest struct {
 	WarehouseID string `form:"warehouseID" validate:"required"`
 	LockerID    string `form:"lockerID" validate:"required,uuid"`
-	Floor       int32  `form:"floor" validate:"required"`
-	No          int32  `form:"no" validate:"required"`
+	Floor       int32  `form:"floor" validate:"omitempty,min=0"`
+	No          int32  `form:"no" validate:"omitempty,min=0"`
 	Address     string `form:"address" validate:"required"`
 	Description string `form:"description" validate:"required"`
 	MedicalName string `form:"medicalName" validate:"required"`
@@ -38,8 +38,8 @@ type CreateMedicineRequest struct {
 type UpdateMedicineRequest struct {
 	MedicineID  string `param:"medicineID" validate:"required"`
 	LockerID    string `form:"lockerID" validate:"required,uuid"`
-	Floor       int32  `form:"floor" validate:"required"`
-	No          int32  `form:"no" validate:"required"`
+	Floor       int32  `form:"floor" validate:"omitempty,min=0"`
+	No          int32  `form:"no" validate:"omitempty,min=0"`
 	Address     string `form:"address" validate:"required"`
 	Description string `form:"description" validate:"required"`
 	MedicalName string `form:"medicalName" validate:"required"`
