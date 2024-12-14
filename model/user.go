@@ -5,4 +5,5 @@ type User struct {
 	FirebaseUID *string `json:"-"`
 	Email       string  `json:"email"`
 	ImageURL    string  `json:"imageURL,omitempty"`
+	DisplayName string  `json:"displayName,omitempty"`
 }

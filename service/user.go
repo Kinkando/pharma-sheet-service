@@ -61,6 +61,7 @@ func (s *user) GetUserInfo(ctx context.Context) (user model.User, err error) {
 		FirebaseUID: userInfo.FirebaseUID,
 		Email:       userInfo.Email,
 		ImageURL:    authUser.PhotoURL,
+		DisplayName: authUser.DisplayName,
 	}
 
 	return user, nil
