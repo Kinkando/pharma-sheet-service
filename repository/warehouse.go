@@ -19,7 +19,9 @@ import (
 
 type Warehouse interface {
 	GetWarehouses(ctx context.Context) ([]model.Warehouse, error)
+	GetWarehouseRole(ctx context.Context, warehouseID string) (genmodel.Role, error)
 	CreateWarehouse(ctx context.Context, req model.Warehouse) (string, error)
+	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
 }
 
 type warehouse struct {
@@ -111,4 +113,48 @@ func (r *warehouse) CreateWarehouse(ctx context.Context, req model.Warehouse) (w
 	}
 
 	return warehouseID, nil
+}
+
+func (r *warehouse) UpdateWarehouse(ctx context.Context, req model.Warehouse) error {
+	warehouses := table.Warehouses
+
+	now := time.Now()
+	warehouse := genmodel.Warehouses{
+		WarehouseID: uuid.MustParse(req.WarehouseID),
+		Name:        req.Name,
+		UpdatedAt:   &now,
+	}
+
+	sql, args := warehouses.
+		UPDATE(warehouses.Name, warehouses.UpdatedAt).
+		WHERE(warehouses.WarehouseID.EQ(postgres.UUID(warehouse.WarehouseID))).
+		MODEL(warehouse).
+		Sql()
+	_, err := r.pgPool.Exec(ctx, sql, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID string) (role genmodel.Role, err error) {
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return
+	}
+
+	query, args := table.WarehouseUsers.
+		SELECT(table.WarehouseUsers.Role).
+		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID)))).
+		Sql()
+
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&role)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	return role, nil
 }
