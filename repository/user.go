@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/go-jet/jet/v2/postgres"
 	"github.com/google/uuid"
@@ -58,6 +59,7 @@ func (r *user) CreateUser(ctx context.Context, user model.Users) (string, error)
 	users := table.Users
 
 	user.UserID = uuid.MustParse(generator.UUID())
+	user.CreatedAt = time.Now()
 
 	sql, args := users.INSERT(users.UserID, users.FirebaseUID, users.Email, users.CreatedAt).MODEL(user).Sql()
 	_, err := r.pgPool.Exec(ctx, sql, args...)

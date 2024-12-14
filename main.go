@@ -79,8 +79,10 @@ func main() {
 
 	jwtService := service.NewJWTService(cfg.App.JWTKey, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
 	authenService := service.NewAuthenService(userRepository, cacheRepository, jwtService, firebaseAuthen)
+	userService := service.NewUserService(userRepository, firebaseAuthen)
 
 	http.NewAuthenHandler(httpServer.Routers(), validate, cfg.App.APIKey, authenService)
+	http.NewUserHandler(httpServer.Routers(), validate, userService)
 
 	httpServer.ListenAndServe()
 	httpServer.GracefulShutdown()
