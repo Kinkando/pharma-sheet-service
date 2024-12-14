@@ -7,7 +7,7 @@ CREATE TYPE role AS ENUM (
 
 CREATE TABLE users (
   user_id UUID PRIMARY KEY,
-  firebase_uid TEXT UNIQUE NOT NULL,
+  firebase_uid TEXT UNIQUE,
   email TEXT UNIQUE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ
