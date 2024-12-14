@@ -76,13 +76,16 @@ func main() {
 
 	userRepository := repository.NewUserRepository(pgPool)
 	cacheRepository := repository.NewCacheRepository(redisClient, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
+	warehouseRepository := repository.NewWarehouseRepository(pgPool)
 
 	jwtService := service.NewJWTService(cfg.App.JWTKey, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
 	authenService := service.NewAuthenService(userRepository, cacheRepository, jwtService, firebaseAuthen)
 	userService := service.NewUserService(userRepository, firebaseAuthen)
+	warehouseService := service.NewWarehouseService(warehouseRepository)
 
 	http.NewAuthenHandler(httpServer.Routers(), validate, cfg.App.APIKey, authenService)
 	http.NewUserHandler(httpServer.Routers(), validate, userService)
+	http.NewWarehouseHandler(httpServer.Routers(), validate, warehouseService)
 
 	httpServer.ListenAndServe()
 	httpServer.GracefulShutdown()
