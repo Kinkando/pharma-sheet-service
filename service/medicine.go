@@ -142,14 +142,15 @@ func (s *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 		}
 
-		if medicine.ImageURL != nil {
-			err = s.storage.RemoveFile(ctx, *medicine.ImageURL)
-			if err != nil {
-				logger.Context(ctx).Warn(err)
-			}
-		}
-
+		req.DeleteImage = true
 		req.ImageURL = &path
+	}
+
+	if req.DeleteImage && medicine.ImageURL != nil {
+		err = s.storage.RemoveFile(ctx, *medicine.ImageURL)
+		if err != nil {
+			logger.Context(ctx).Warn(err)
+		}
 	}
 
 	err = s.medicineRepository.UpdateMedicine(ctx, req)

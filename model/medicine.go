@@ -43,6 +43,7 @@ type UpdateMedicineRequest struct {
 	Description string `form:"description" validate:"required"`
 	MedicalName string `form:"medicalName" validate:"required"`
 	Label       string `form:"label" validate:"required"`
+	DeleteImage bool   `form:"deleteImage"`
 	File        *multipart.FileHeader
 	ImageURL    *string
 }
