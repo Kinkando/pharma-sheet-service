@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
@@ -43,7 +44,13 @@ func (s *user) GetUserInfo(ctx context.Context) (user model.User, err error) {
 		return
 	}
 
-	authUser, err := s.firebseAuthen.GetUser(ctx, userInfo.FirebaseUID)
+	if userInfo.FirebaseUID == nil {
+		err = fmt.Errorf("user is not found in firebase authen")
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	authUser, err := s.firebseAuthen.GetUser(ctx, *userInfo.FirebaseUID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return

@@ -56,7 +56,7 @@ func (s *authen) VerifyToken(ctx context.Context, idToken string) (model.JWT, er
 		return model.JWT{}, err
 	}
 
-	jwt, err := s.createToken(ctx, genmodel.Users{FirebaseUID: token.UID, Email: fmt.Sprintf("%+v", emails[0])})
+	jwt, err := s.createToken(ctx, genmodel.Users{FirebaseUID: &token.UID, Email: fmt.Sprintf("%+v", emails[0])})
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return model.JWT{}, err
@@ -131,11 +131,21 @@ func (s *authen) createToken(ctx context.Context, userReq genmodel.Users) (jwt m
 			logger.Context(ctx).Error(err)
 			return jwt, err
 		}
+		user = userReq
 		user.UserID = uuid.MustParse(userID)
 
 	} else if err != nil {
 		logger.Context(ctx).Error(err)
 		return
+	}
+
+	if user.FirebaseUID == nil {
+		err = s.userRepository.UpdateUser(ctx, genmodel.Users{UserID: userReq.UserID, FirebaseUID: userReq.FirebaseUID})
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return jwt, err
+		}
+		user.FirebaseUID = userReq.FirebaseUID
 	}
 
 	accessToken, refreshToken := s.jwtService.EncodeJWT(ctx, user.UserID.String())

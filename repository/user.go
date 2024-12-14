@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-jet/jet/v2/postgres"
@@ -17,6 +18,7 @@ import (
 type User interface {
 	GetUser(ctx context.Context, user model.Users) (model.Users, error)
 	CreateUser(ctx context.Context, user model.Users) (string, error)
+	UpdateUser(ctx context.Context, user model.Users) error
 }
 
 type user struct {
@@ -32,20 +34,24 @@ func NewUserRepository(pgPool *pgxpool.Pool) User {
 func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.Users, err error) {
 	users := table.Users
 
-	var condition postgres.BoolExpression
+	var conditions []postgres.BoolExpression
 	if filter.UserID != uuid.Nil {
-		condition = users.UserID.EQ(postgres.UUID(filter.UserID))
-	} else if filter.FirebaseUID != "" {
-		condition = users.FirebaseUID.EQ(postgres.String(filter.FirebaseUID))
-	} else if filter.Email != "" {
-		condition = users.Email.EQ(postgres.String(filter.Email))
-	} else {
-		err = errors.New("filter must be provided")
+		conditions = append(conditions, users.UserID.EQ(postgres.UUID(filter.UserID)))
+	}
+	if filter.FirebaseUID != nil {
+		conditions = append(conditions, users.FirebaseUID.EQ(postgres.String(*filter.FirebaseUID)))
+	}
+	if filter.Email != "" {
+		conditions = append(conditions, users.Email.EQ(postgres.String(filter.Email)))
+	}
+
+	if len(conditions) == 0 {
+		err = errors.New("filter is invalid")
 		logger.Context(ctx).Error(err)
 		return
 	}
 
-	query, args := users.SELECT(users.UserID, users.FirebaseUID, users.Email).WHERE(condition).Sql()
+	query, args := users.SELECT(users.UserID, users.FirebaseUID, users.Email).WHERE(postgres.OR(conditions...)).Sql()
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&user.UserID, &user.FirebaseUID, &user.Email)
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -69,4 +75,35 @@ func (r *user) CreateUser(ctx context.Context, user model.Users) (string, error)
 	}
 
 	return user.UserID.String(), nil
+}
+
+func (r *user) UpdateUser(ctx context.Context, user model.Users) error {
+	users := table.Users
+
+	columnNames := postgres.ColumnList{users.UpdatedAt}
+	columnValues := []any{postgres.TimestampzT(time.Now())}
+
+	if user.FirebaseUID != nil {
+		columnNames = append(columnNames, users.FirebaseUID)
+		columnValues = append(columnValues, postgres.String(*user.FirebaseUID))
+	}
+
+	if len(columnValues) <= 1 {
+		err := fmt.Errorf("no specific column would be updated")
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	sql, args := users.
+		UPDATE(columnNames).
+		SET(columnValues[0], columnValues[1:]...).
+		WHERE(users.UserID.EQ(postgres.UUID(user.UserID))).
+		Sql()
+	_, err := r.pgPool.Exec(ctx, sql, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return nil
 }
