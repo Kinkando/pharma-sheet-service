@@ -90,7 +90,7 @@ func (s *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineR
 	}
 
 	if req.File != nil {
-		path, err := s.storage.UploadFile(ctx, req.File, medicineDirectory)
+		path, err := s.storage.UploadFile(ctx, req.File, medicineDirectory+"/"+req.WarehouseID)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return "", echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -130,7 +130,7 @@ func (s *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 	}
 
 	if req.File != nil {
-		path, err := s.storage.UploadFile(ctx, req.File, medicineDirectory)
+		path, err := s.storage.UploadFile(ctx, req.File, medicineDirectory+"/"+medicine.WarehouseID)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})

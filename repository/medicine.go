@@ -61,6 +61,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicineID string) (medicine
 		LEFT_JOIN(table.Lockers, medicines.LockerID.EQ(table.Lockers.LockerID)).
 		SELECT(
 			medicines.MedicineID,
+			medicines.WarehouseID,
 			medicines.LockerID,
 			table.Lockers.Name,
 			medicines.Floor,
@@ -76,6 +77,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicineID string) (medicine
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(
 		&medicine.MedicineID,
+		&medicine.WarehouseID,
 		&medicine.LockerID,
 		&medicine.LockerName,
 		&medicine.Floor,
@@ -127,6 +129,7 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 		LEFT_JOIN(table.Lockers, medicines.LockerID.EQ(table.Lockers.LockerID)).
 		SELECT(
 			medicines.MedicineID,
+			medicines.WarehouseID,
 			medicines.LockerID,
 			table.Lockers.Name,
 			medicines.Floor,
@@ -154,6 +157,7 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 		var medicine model.Medicine
 		err = rows.Scan(
 			&medicine.MedicineID,
+			&medicine.WarehouseID,
 			&medicine.LockerID,
 			&medicine.LockerName,
 			&medicine.Floor,
