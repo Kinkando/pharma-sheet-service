@@ -33,7 +33,7 @@ CREATE TABLE warehouse_users (
 
 CREATE TABLE lockers (
   locker_id UUID PRIMARY KEY,
-  warehouse_id UUID,
+  warehouse_id UUID NOT NULL,
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,

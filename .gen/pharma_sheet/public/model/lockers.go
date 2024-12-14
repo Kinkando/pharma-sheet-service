@@ -14,7 +14,7 @@ import (
 
 type Lockers struct {
 	LockerID    uuid.UUID `sql:"primary_key"`
-	WarehouseID *uuid.UUID
+	WarehouseID uuid.UUID
 	Name        string
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
