@@ -52,8 +52,8 @@ func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.User
 		return
 	}
 
-	query, args := users.SELECT(users.UserID, users.FirebaseUID, users.Email).WHERE(postgres.OR(conditions...)).Sql()
-	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&user.UserID, &user.FirebaseUID, &user.Email)
+	query, args := users.SELECT(users.UserID, users.FirebaseUID, users.Email, users.DisplayName, users.ImageURL).WHERE(postgres.OR(conditions...)).Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&user.UserID, &user.FirebaseUID, &user.Email, &user.DisplayName, &user.ImageURL)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return
@@ -68,7 +68,7 @@ func (r *user) CreateUser(ctx context.Context, user model.Users) (string, error)
 	user.UserID = uuid.MustParse(generator.UUID())
 	user.CreatedAt = time.Now()
 
-	sql, args := users.INSERT(users.UserID, users.FirebaseUID, users.Email, users.CreatedAt).MODEL(user).Sql()
+	sql, args := users.INSERT(users.UserID, users.FirebaseUID, users.Email, users.ImageURL, users.CreatedAt).MODEL(user).Sql()
 	_, err := r.pgPool.Exec(ctx, sql, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -87,6 +87,11 @@ func (r *user) UpdateUser(ctx context.Context, user model.Users) error {
 	if user.FirebaseUID != nil {
 		columnNames = append(columnNames, users.FirebaseUID)
 		columnValues = append(columnValues, postgres.String(*user.FirebaseUID))
+	}
+
+	if user.ImageURL != nil {
+		columnNames = append(columnNames, users.ImageURL)
+		columnValues = append(columnValues, postgres.String(*user.ImageURL))
 	}
 
 	if len(columnValues) <= 1 {

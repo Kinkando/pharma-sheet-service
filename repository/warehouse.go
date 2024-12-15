@@ -182,6 +182,8 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 			table.WarehouseUsers.Role,
 			table.Users.FirebaseUID,
 			table.Users.Email,
+			table.Users.DisplayName,
+			table.Users.ImageURL,
 		).
 		WHERE(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
 		Sql()
@@ -200,6 +202,8 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 			&warehouseUser.Role,
 			&warehouseUser.FirebaseUID,
 			&warehouseUser.Email,
+			&warehouseUser.DisplayName,
+			&warehouseUser.ImageURL,
 		)
 		if err != nil {
 			logger.Context(ctx).Error(err)

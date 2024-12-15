@@ -289,15 +289,10 @@ func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	conc := pool.New().WithContext(ctx).WithMaxGoroutines(5).WithCancelOnError()
 	for index := range warehouseUsers {
 		user, index := warehouseUsers[index], index
-		if user.FirebaseUID != nil {
+		if user.ImageURL != nil {
 			conc.Go(func(ctx context.Context) error {
-				authUser, err := s.firebaseAuthen.GetUser(ctx, *user.FirebaseUID)
-				if err != nil {
-					logger.Context(ctx).Error(err)
-					return err
-				}
-				warehouseUsers[index].DisplayName = authUser.DisplayName
-				warehouseUsers[index].ImageURL = authUser.PhotoURL
+				url := s.storage.GetPublicUrl(*user.ImageURL)
+				warehouseUsers[index].ImageURL = &url
 
 				return nil
 			})
