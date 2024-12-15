@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/enum"
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/table"
 	"github.com/kinkando/pharma-sheet-service/model"
@@ -28,7 +29,7 @@ type Warehouse interface {
 	DeleteWarehouse(ctx context.Context, warehouseID string) error
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
-	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
+	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error
 	UpdateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
 	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
 }
@@ -50,7 +51,7 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 	query, args := table.Warehouses.
 		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
 		SELECT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.WarehouseUsers.Role).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID)))).
+		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))).
 		ORDER_BY(table.Warehouses.Name.ASC()).
 		Sql()
 
@@ -80,7 +81,7 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 		return
 	}
 
-	condition := table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID)))
+	condition := table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))
 	if filter.Search != "" {
 		search := postgres.String("%" + strings.ToLower(filter.Search) + "%")
 		condition = condition.AND(postgres.LOWER(table.Warehouses.Name).LIKE(search))
@@ -220,7 +221,7 @@ func (r *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) err
 func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID string) (role genmodel.Role, err error) {
 	query, args := table.WarehouseUsers.
 		SELECT(table.WarehouseUsers.Role).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID)))).
+		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))).
 		Sql()
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&role)
@@ -242,6 +243,7 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 			table.Users.Email,
 			table.Users.DisplayName,
 			table.Users.ImageURL,
+			table.WarehouseUsers.Status,
 		).
 		WHERE(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
 		ORDER_BY(table.Users.Email.ASC()).
@@ -263,6 +265,7 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 			&warehouseUser.Email,
 			&warehouseUser.DisplayName,
 			&warehouseUser.ImageURL,
+			&warehouseUser.Status,
 		)
 		if err != nil {
 			logger.Context(ctx).Error(err)
@@ -274,18 +277,19 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	return warehouseUsers, nil
 }
 
-func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error {
+func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error {
 	warehouseUsers := table.WarehouseUsers
 
 	warehouse := genmodel.WarehouseUsers{
 		WarehouseID: uuid.MustParse(warehouseID),
 		UserID:      uuid.MustParse(userID),
 		Role:        role,
+		Status:      status,
 		CreatedAt:   time.Now(),
 	}
 
 	sql, args := warehouseUsers.
-		INSERT(warehouseUsers.WarehouseID, warehouseUsers.UserID, warehouseUsers.Role, warehouseUsers.CreatedAt).
+		INSERT(warehouseUsers.WarehouseID, warehouseUsers.UserID, warehouseUsers.Role, warehouseUsers.Status, warehouseUsers.CreatedAt).
 		MODEL(warehouse).
 		Sql()
 	_, err := r.pgPool.Exec(ctx, sql, args...)

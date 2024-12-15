@@ -9,6 +9,7 @@ import (
 	"github.com/go-jet/jet/v2/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/enum"
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/table"
 	"github.com/kinkando/pharma-sheet-service/model"
@@ -38,7 +39,7 @@ func (r *medicine) GetMedicineRole(ctx context.Context, medicineID, userID strin
 	query, args := table.WarehouseUsers.
 		INNER_JOIN(table.Medicines, table.WarehouseUsers.WarehouseID.EQ(table.Medicines.WarehouseID)).
 		SELECT(table.WarehouseUsers.Role).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID)))).
+		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))).
 		Sql()
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&role)

@@ -86,7 +86,8 @@ type DeleteWarehouseUserRequest struct {
 
 type WarehouseUser struct {
 	User
-	Role model.Role `json:"role"`
+	Role   model.Role           `json:"role"`
+	Status model.ApprovalStatus `json:"status"`
 }
 
 type DeleteLockerFilter struct {

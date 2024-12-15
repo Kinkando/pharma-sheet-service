@@ -375,7 +375,7 @@ func (s *warehouse) CreateWarehouseUser(ctx context.Context, req model.CreateWar
 		user.UserID = uuid.MustParse(userID)
 	}
 
-	err = s.warehouseRepository.CreateWarehouseUser(ctx, req.WarehouseID, user.UserID.String(), req.Role)
+	err = s.warehouseRepository.CreateWarehouseUser(ctx, req.WarehouseID, user.UserID.String(), req.Role, genmodel.ApprovalStatus_Approved)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
