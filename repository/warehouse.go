@@ -166,7 +166,7 @@ func (r *warehouse) CreateWarehouse(ctx context.Context, req model.Warehouse) (w
 		}
 
 		sql, args = table.WarehouseUsers.
-			INSERT(table.WarehouseUsers.WarehouseID, table.WarehouseUsers.UserID, table.WarehouseUsers.Role, table.Warehouses.CreatedAt).
+			INSERT(table.WarehouseUsers.WarehouseID, table.WarehouseUsers.UserID, table.WarehouseUsers.Role, table.WarehouseUsers.Status, table.Warehouses.CreatedAt).
 			MODEL(warehouseUserData).
 			Sql()
 		_, err = tx.Exec(ctx, sql, args...)
