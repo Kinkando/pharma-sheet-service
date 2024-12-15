@@ -151,6 +151,7 @@ func (r *warehouse) CreateWarehouse(ctx context.Context, req model.Warehouse) (w
 			WarehouseID: uuid.MustParse(warehouseID),
 			Role:        genmodel.Role_Admin,
 			UserID:      uuid.MustParse(userProfile.UserID),
+			Status:      genmodel.ApprovalStatus_Approved,
 			CreatedAt:   time.Now(),
 		}
 
