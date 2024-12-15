@@ -140,7 +140,7 @@ func (s *authen) createToken(ctx context.Context, userReq genmodel.Users) (jwt m
 	}
 
 	if user.FirebaseUID == nil {
-		err = s.userRepository.UpdateUser(ctx, genmodel.Users{UserID: userReq.UserID, FirebaseUID: userReq.FirebaseUID})
+		err = s.userRepository.UpdateUser(ctx, genmodel.Users{UserID: user.UserID, FirebaseUID: userReq.FirebaseUID})
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return jwt, err
