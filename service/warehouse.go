@@ -34,6 +34,8 @@ type Warehouse interface {
 	CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error
 	UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error
 	DeleteWarehouseUser(ctx context.Context, req model.DeleteWarehouseUserRequest) error
+	ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
+	RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 }
 
 type warehouse struct {
@@ -432,5 +434,81 @@ func (s *warehouse) DeleteWarehouseUser(ctx context.Context, req model.DeleteWar
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	return nil
+}
+
+func (s *warehouse) ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error {
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+	}
+
+	if req.UserID == userProfile.UserID {
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "approve yourself is not allowed"})
+	}
+
+	status, err := s.warehouseRepository.GetWarehouseUserStatus(ctx, req.WarehouseID, req.UserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "userID is not found"})
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	if status != genmodel.ApprovalStatus_Pending {
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "status is not pending"})
+	}
+
+	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.WarehouseUsers{
+		WarehouseID: uuid.MustParse(req.WarehouseID),
+		UserID:      uuid.MustParse(req.UserID),
+		Status:      genmodel.ApprovalStatus_Approved,
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	return nil
+}
+
+func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error {
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+	}
+
+	if req.UserID == userProfile.UserID {
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "reject yourself is not allowed"})
+	}
+
+	status, err := s.warehouseRepository.GetWarehouseUserStatus(ctx, req.WarehouseID, req.UserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "userID is not found"})
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	if status != genmodel.ApprovalStatus_Pending {
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "status is not pending"})
+	}
+
+	err = s.warehouseRepository.DeleteWarehouseUser(ctx, req.WarehouseID, &req.UserID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
 	return nil
 }

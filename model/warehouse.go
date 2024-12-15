@@ -84,6 +84,11 @@ type DeleteWarehouseUserRequest struct {
 	UserID      string `param:"userID" validate:"required,uuid"`
 }
 
+type ApprovalWarehouseUserRequest struct {
+	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	UserID      string `param:"userID" validate:"required,uuid"`
+}
+
 type WarehouseUser struct {
 	User
 	Role   model.Role           `json:"role"`

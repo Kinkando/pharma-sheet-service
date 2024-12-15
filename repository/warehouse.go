@@ -30,6 +30,7 @@ type Warehouse interface {
 	DeleteWarehouse(ctx context.Context, warehouseID string) error
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
+	GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (genmodel.ApprovalStatus, error)
 	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error
 	UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error
 	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
@@ -222,7 +223,11 @@ func (r *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) err
 func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID string) (role genmodel.Role, err error) {
 	query, args := table.WarehouseUsers.
 		SELECT(table.WarehouseUsers.Role).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))).
+		WHERE(
+			table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(
+				table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved)).AND(
+				table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))),
+		).
 		Sql()
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&role)
@@ -276,6 +281,21 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	}
 
 	return warehouseUsers, nil
+}
+
+func (r *warehouse) GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (status genmodel.ApprovalStatus, err error) {
+	query, args := table.WarehouseUsers.
+		SELECT(table.WarehouseUsers.Status).
+		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID))))).
+		Sql()
+
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&status)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	return status, nil
 }
 
 func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error {
