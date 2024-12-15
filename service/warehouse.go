@@ -21,6 +21,7 @@ import (
 
 type Warehouse interface {
 	GetWarehouses(ctx context.Context) ([]model.Warehouse, error)
+	GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (model.PagingWithMetadata[model.WarehouseDetail], error)
 	CreateWarehouse(ctx context.Context, req model.CreateWarehouseRequest) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.UpdateWarehouseRequest) error
 	DeleteWarehouse(ctx context.Context, req model.DeleteWarehouseRequest) error
@@ -85,6 +86,47 @@ func (s *warehouse) GetWarehouses(ctx context.Context) ([]model.Warehouse, error
 	}
 
 	return warehouses, nil
+}
+
+func (s *warehouse) GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (res model.PagingWithMetadata[model.WarehouseDetail], err error) {
+	data, total, err := s.warehouseRepository.GetWarehouseDetails(ctx, filter)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return res, err
+	}
+
+	for index, warehouse := range data {
+		lockers, err := s.lockerRepository.GetLockers(ctx, warehouse.WarehouseID)
+		if err != nil {
+			return res, err
+		}
+
+		medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: warehouse.WarehouseID})
+		if err != nil {
+			return res, err
+		}
+
+		warehouseLockers := make([]model.LockerDetail, 0, len(lockers))
+		for _, locker := range lockers {
+			var totalMedicine uint64 = 0
+			for _, medicine := range medicines {
+				if medicine.LockerID == locker.LockerID.String() {
+					totalMedicine++
+				}
+			}
+			warehouseLockers = append(warehouseLockers, model.LockerDetail{
+				LockerID:      locker.LockerID.String(),
+				LockerName:    locker.Name,
+				TotalMedicine: totalMedicine,
+			})
+		}
+		data[index].LockerDetails = warehouseLockers
+		data[index].TotalLocker = uint64(len(lockers))
+		data[index].TotalMedicine = uint64(len(medicines))
+	}
+
+	res = model.PaginationResponse(data, filter.Pagination, total)
+	return res, nil
 }
 
 func (s *warehouse) CreateWarehouse(ctx context.Context, req model.CreateWarehouseRequest) (string, error) {

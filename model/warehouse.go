@@ -14,6 +14,26 @@ type Locker struct {
 	LockerName string `json:"lockerName"`
 }
 
+type FilterWarehouseDetail struct {
+	Pagination
+	Search string `json:"-" query:"search"`
+}
+
+type WarehouseDetail struct {
+	WarehouseID   string         `json:"warehouseID"`
+	Name          string         `json:"warehouseName"`
+	Role          string         `json:"role"`
+	LockerDetails []LockerDetail `json:"lockerDetails"`
+	TotalLocker   uint64         `json:"totalLocker"`
+	TotalMedicine uint64         `json:"totalMedicine"`
+}
+
+type LockerDetail struct {
+	LockerID      string `json:"lockerID"`
+	LockerName    string `json:"lockerName"`
+	TotalMedicine uint64 `json:"totalMedicine"`
+}
+
 type CreateWarehouseRequest struct {
 	WarehouseName string `json:"warehouseName" validate:"required"`
 }

@@ -23,6 +23,7 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 
 	route := e.Group("/warehouse")
 	route.GET("", handler.getWarehouse)
+	route.GET("/detail", handler.getWarehouseDetails)
 	route.POST("", handler.createWarehouse)
 	route.PATCH("/:warehouseID", handler.updateWarehouse)
 	route.DELETE("/:warehouseID", handler.deleteWarehouse)
@@ -48,6 +49,30 @@ func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
 
 	if warehouses == nil {
 		warehouses = []model.Warehouse{}
+	}
+
+	return c.JSON(http.StatusOK, warehouses)
+}
+
+func (h *WarehouseHandler) getWarehouseDetails(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.FilterWarehouseDetail
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+	req.Pagination.AssignDefault()
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	warehouses, err := h.warehouseService.GetWarehouseDetails(ctx, req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
 	return c.JSON(http.StatusOK, warehouses)

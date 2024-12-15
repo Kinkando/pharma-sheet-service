@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/go-jet/jet/v2/postgres"
@@ -20,6 +21,7 @@ import (
 
 type Warehouse interface {
 	GetWarehouses(ctx context.Context) ([]model.Warehouse, error)
+	GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (data []model.WarehouseDetail, total uint64, err error)
 	GetWarehouseRole(ctx context.Context, warehouseID, userID string) (genmodel.Role, error)
 	CreateWarehouse(ctx context.Context, req model.Warehouse) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
@@ -70,6 +72,62 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 	}
 
 	return warehouses, nil
+}
+
+func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (data []model.WarehouseDetail, total uint64, err error) {
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return
+	}
+
+	condition := table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID)))
+	if filter.Search != "" {
+		search := postgres.String("%" + strings.ToLower(filter.Search) + "%")
+		condition = condition.AND(postgres.LOWER(table.Warehouses.Name).LIKE(search))
+	}
+
+	query, args := table.Warehouses.
+		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
+		SELECT(postgres.COUNT(table.Warehouses.WarehouseID)).
+		WHERE(condition).
+		Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&total)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	if total == 0 {
+		return
+	}
+
+	query, args = table.Warehouses.
+		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
+		SELECT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.WarehouseUsers.Role).
+		WHERE(condition).
+		LIMIT(int64(filter.Limit)).
+		OFFSET(int64(filter.Offset)).
+		ORDER_BY(table.Warehouses.Name.ASC()).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var warehouse model.WarehouseDetail
+		err = rows.Scan(&warehouse.WarehouseID, &warehouse.Name, &warehouse.Role)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, 0, err
+		}
+		data = append(data, warehouse)
+	}
+
+	return data, total, nil
 }
 
 func (r *warehouse) CreateWarehouse(ctx context.Context, req model.Warehouse) (warehouseID string, err error) {
