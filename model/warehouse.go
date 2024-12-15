@@ -38,6 +38,12 @@ type GetWarehouseUserRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 }
 
+type CreateWarehouseUserRequest struct {
+	WarehouseID string     `param:"warehouseID" validate:"required,uuid"`
+	Email       string     `json:"email" validate:"required,email"`
+	Role        model.Role `json:"role" validate:"required,oneof=ADMIN EDITOR VIEWER"`
+}
+
 type UpdateWarehouseUserRequest struct {
 	WarehouseID string     `param:"warehouseID" validate:"required,uuid"`
 	UserID      string     `param:"userID" validate:"required,uuid"`

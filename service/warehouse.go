@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"net/http"
 	"slices"
 
@@ -24,7 +26,8 @@ type Warehouse interface {
 	UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
-	UpdateWarehouseUsers(ctx context.Context, req model.UpdateWarehouseUserRequest) error
+	CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error
+	UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error
 }
 
 type warehouse struct {
@@ -178,7 +181,38 @@ func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	return warehouseUsers, nil
 }
 
-func (s *warehouse) UpdateWarehouseUsers(ctx context.Context, req model.UpdateWarehouseUserRequest) error {
+func (s *warehouse) CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error {
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	userReq := genmodel.Users{Email: req.Email}
+	user, err := s.userRepository.GetUser(ctx, userReq)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		userID, err := s.userRepository.CreateUser(ctx, userReq)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return err
+		}
+		user.UserID = uuid.MustParse(userID)
+	}
+
+	err = s.warehouseRepository.CreateWarehouseUser(ctx, req.WarehouseID, user.UserID.String(), req.Role)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return nil
+}
+
+func (s *warehouse) UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error {
 	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -194,7 +228,7 @@ func (s *warehouse) UpdateWarehouseUsers(ctx context.Context, req model.UpdateWa
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "grant yourself is not allowed"})
 	}
 
-	err = s.warehouseRepository.UpdateWarehouseUsers(ctx, req.WarehouseID, req.UserID, req.Role)
+	err = s.warehouseRepository.UpdateWarehouseUser(ctx, req.WarehouseID, req.UserID, req.Role)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})

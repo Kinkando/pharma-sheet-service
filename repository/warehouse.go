@@ -25,7 +25,8 @@ type Warehouse interface {
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
-	UpdateWarehouseUsers(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
+	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
+	UpdateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
 }
 
 type warehouse struct {
@@ -195,7 +196,30 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	return warehouseUsers, nil
 }
 
-func (r *warehouse) UpdateWarehouseUsers(ctx context.Context, warehouseID, userID string, role genmodel.Role) error {
+func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error {
+	warehouseUsers := table.WarehouseUsers
+
+	warehouse := genmodel.WarehouseUsers{
+		WarehouseID: uuid.MustParse(warehouseID),
+		UserID:      uuid.MustParse(userID),
+		Role:        role,
+		CreatedAt:   time.Now(),
+	}
+
+	sql, args := warehouseUsers.
+		INSERT(warehouseUsers.WarehouseID, warehouseUsers.UserID, warehouseUsers.Role, warehouseUsers.CreatedAt).
+		MODEL(warehouse).
+		Sql()
+	_, err := r.pgPool.Exec(ctx, sql, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error {
 	warehouseUsers := table.WarehouseUsers
 
 	now := time.Now()
