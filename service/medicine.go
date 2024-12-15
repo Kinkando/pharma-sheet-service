@@ -188,9 +188,12 @@ func (s *medicine) DeleteMedicine(ctx context.Context, medicineID string) error 
 		}
 	}
 
-	err = s.medicineRepository.DeleteMedicine(ctx, medicineID)
+	rowsAffected, err := s.medicineRepository.DeleteMedicine(ctx, model.DeleteMedicineFilter{MedicineID: medicineID})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	if rowsAffected == 0 {
+		return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicineID is not found"})
 	}
 	return nil
 }

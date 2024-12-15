@@ -48,3 +48,9 @@ type UpdateMedicineRequest struct {
 	File        *multipart.FileHeader
 	ImageURL    *string
 }
+
+type DeleteMedicineFilter struct {
+	MedicineID  string
+	LockerID    string
+	WarehouseID string
+}

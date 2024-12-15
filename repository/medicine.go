@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"time"
 
@@ -22,7 +21,7 @@ type Medicine interface {
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicineID string, err error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
-	DeleteMedicine(ctx context.Context, medicineID string) error
+	DeleteMedicine(ctx context.Context, filter model.DeleteMedicineFilter) (int64, error)
 }
 
 type medicine struct {
@@ -261,15 +260,20 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 	return nil
 }
 
-func (r *medicine) DeleteMedicine(ctx context.Context, medicineID string) error {
-	stmt, args := table.Medicines.DELETE().WHERE(table.Medicines.MedicineID.EQ(postgres.UUID(uuid.MustParse(medicineID)))).Sql()
+func (r *medicine) DeleteMedicine(ctx context.Context, filter model.DeleteMedicineFilter) (int64, error) {
+	var condition postgres.BoolExpression
+	if filter.MedicineID != "" {
+		condition = table.Medicines.MedicineID.EQ(postgres.UUID(uuid.MustParse(filter.MedicineID)))
+	} else if filter.LockerID != "" {
+		condition = table.Medicines.LockerID.EQ(postgres.UUID(uuid.MustParse(filter.LockerID)))
+	} else if filter.WarehouseID != "" {
+		condition = table.Medicines.WarehouseID.EQ(postgres.UUID(uuid.MustParse(filter.WarehouseID)))
+	}
+	stmt, args := table.Medicines.DELETE().WHERE(condition).Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return err
+		return 0, err
 	}
-	if result.RowsAffected() == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
+	return result.RowsAffected(), nil
 }
