@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ type Medicine interface {
 	GetMedicineRole(ctx context.Context, medicineID, userID string) (genmodel.Role, error)
 	GetMedicine(ctx context.Context, medicineID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error)
+	ListMedicines(ctx context.Context, filter model.ListMedicine) ([]model.Medicine, error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicineID string, err error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
 	DeleteMedicine(ctx context.Context, filter model.DeleteMedicineFilter) (int64, error)
@@ -171,6 +173,65 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 	return data, total, nil
 }
 
+func (r *medicine) ListMedicines(ctx context.Context, filter model.ListMedicine) (data []model.Medicine, err error) {
+	medicines := table.Medicines
+
+	var condition postgres.BoolExpression
+	if filter.LockerID != "" {
+		condition = medicines.LockerID.EQ(postgres.UUID(uuid.MustParse(filter.LockerID)))
+	} else if filter.WarehouseID != "" {
+		condition = medicines.WarehouseID.EQ(postgres.UUID(uuid.MustParse(filter.WarehouseID)))
+	} else {
+		return nil, errors.New("filter is invalid")
+	}
+
+	query, args := medicines.
+		SELECT(
+			medicines.MedicineID,
+			medicines.WarehouseID,
+			medicines.LockerID,
+			medicines.Floor,
+			medicines.No,
+			medicines.Address,
+			medicines.Description,
+			medicines.MedicalName,
+			medicines.Label,
+			medicines.ImageURL,
+		).
+		WHERE(condition).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var medicine model.Medicine
+		err = rows.Scan(
+			&medicine.MedicineID,
+			&medicine.WarehouseID,
+			&medicine.LockerID,
+			&medicine.Floor,
+			&medicine.No,
+			&medicine.Address,
+			&medicine.Description,
+			&medicine.MedicalName,
+			&medicine.Label,
+			&medicine.ImageURL,
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, err
+		}
+		data = append(data, medicine)
+	}
+
+	return data, nil
+}
+
 func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicineID string, err error) {
 	medicines := table.Medicines
 
@@ -268,6 +329,8 @@ func (r *medicine) DeleteMedicine(ctx context.Context, filter model.DeleteMedici
 		condition = table.Medicines.LockerID.EQ(postgres.UUID(uuid.MustParse(filter.LockerID)))
 	} else if filter.WarehouseID != "" {
 		condition = table.Medicines.WarehouseID.EQ(postgres.UUID(uuid.MustParse(filter.WarehouseID)))
+	} else {
+		return 0, errors.New("filter is invalid")
 	}
 	stmt, args := table.Medicines.DELETE().WHERE(condition).Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)

@@ -83,7 +83,7 @@ func main() {
 	jwtService := service.NewJWTService(cfg.App.JWTKey, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
 	authenService := service.NewAuthenService(userRepository, cacheRepository, jwtService, firebaseAuthen)
 	userService := service.NewUserService(userRepository, firebaseAuthen)
-	warehouseService := service.NewWarehouseService(warehouseRepository, lockerRepository, userRepository, firebaseAuthen)
+	warehouseService := service.NewWarehouseService(warehouseRepository, lockerRepository, userRepository, medicineRepository, firebaseAuthen, cloudStorage)
 	medicineService := service.NewMedicineService(medicineRepository, warehouseRepository, cloudStorage)
 
 	http.NewHealthzHandler(httpServer.Routers(), pgPool, redisClient)

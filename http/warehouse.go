@@ -25,8 +25,10 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 	route.GET("", handler.getWarehouse)
 	route.POST("", handler.createWarehouse)
 	route.PATCH("/:warehouseID", handler.updateWarehouse)
+	route.DELETE("/:warehouseID", handler.deleteWarehouse)
 	route.POST("/:warehouseID/locker", handler.createWarehouseLocker)
 	route.PATCH("/:warehouseID/locker/:lockerID", handler.updateWarehouseLocker)
+	route.DELETE("/:warehouseID/locker/:lockerID", handler.deleteWarehouseLocker)
 
 	warehouseUserRoute := route.Group("/:warehouseID/user")
 	warehouseUserRoute.GET("", handler.getWarehouseUsers)
@@ -97,6 +99,29 @@ func (h *WarehouseHandler) updateWarehouse(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *WarehouseHandler) deleteWarehouse(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.DeleteWarehouseRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	err := h.warehouseService.DeleteWarehouse(ctx, req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *WarehouseHandler) createWarehouseLocker(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -135,6 +160,29 @@ func (h *WarehouseHandler) updateWarehouseLocker(c echo.Context) error {
 	}
 
 	err := h.warehouseService.UpdateWarehouseLocker(ctx, req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *WarehouseHandler) deleteWarehouseLocker(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.DeleteWarehouseLockerRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	err := h.warehouseService.DeleteWarehouseLocker(ctx, req)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err

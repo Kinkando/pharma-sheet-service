@@ -22,6 +22,11 @@ type FilterMedicine struct {
 	Search      string `json:"-" query:"search"`
 }
 
+type ListMedicine struct {
+	WarehouseID string
+	LockerID    string
+}
+
 type CreateMedicineRequest struct {
 	WarehouseID string `form:"warehouseID" validate:"required"`
 	LockerID    string `form:"lockerID" validate:"required,uuid"`

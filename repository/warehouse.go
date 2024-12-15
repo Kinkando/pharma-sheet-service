@@ -23,11 +23,12 @@ type Warehouse interface {
 	GetWarehouseRole(ctx context.Context, warehouseID, userID string) (genmodel.Role, error)
 	CreateWarehouse(ctx context.Context, req model.Warehouse) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
+	DeleteWarehouse(ctx context.Context, warehouseID string) error
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
 	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
 	UpdateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
-	DeleteWarehouseUser(ctx context.Context, warehouseID, userID string) error
+	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
 }
 
 type warehouse struct {
@@ -145,6 +146,19 @@ func (r *warehouse) UpdateWarehouse(ctx context.Context, req model.Warehouse) er
 	return nil
 }
 
+func (r *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) error {
+	stmt, args := table.Warehouses.DELETE().WHERE(table.Warehouses.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
+	result, err := r.pgPool.Exec(ctx, stmt, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID string) (role genmodel.Role, err error) {
 	query, args := table.WarehouseUsers.
 		SELECT(table.WarehouseUsers.Role).
@@ -249,12 +263,13 @@ func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseID, userID
 	return nil
 }
 
-func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID, userID string) error {
+func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error {
 	warehouseUsers := table.WarehouseUsers
-	stmt, args := table.WarehouseUsers.
-		DELETE().
-		WHERE(warehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID))).AND(warehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))))).
-		Sql()
+	condition := warehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))
+	if userID != nil {
+		condition = condition.AND(warehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(*userID))))
+	}
+	stmt, args := table.WarehouseUsers.DELETE().WHERE(condition).Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)

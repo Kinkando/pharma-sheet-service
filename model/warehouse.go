@@ -40,7 +40,7 @@ type UpdateWarehouseLockerRequest struct {
 
 type DeleteWarehouseLockerRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
-	LockerID    string `param:"lockerName" validate:"required,uuid"`
+	LockerID    string `param:"lockerID" validate:"required,uuid"`
 }
 
 type GetWarehouseUserRequest struct {
@@ -67,4 +67,9 @@ type DeleteWarehouseUserRequest struct {
 type WarehouseUser struct {
 	User
 	Role model.Role `json:"role"`
+}
+
+type DeleteLockerFilter struct {
+	LockerID    string
+	WarehouseID string
 }
