@@ -137,7 +137,7 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 		WHERE(condition).
 		LIMIT(int64(filter.Limit)).
 		OFFSET(int64(filter.Offset)).
-		ORDER_BY(medicines.MedicalName.ASC()).
+		ORDER_BY(medicines.Description.ASC()).
 		Sql()
 
 	rows, err := r.pgPool.Query(ctx, query, args...)

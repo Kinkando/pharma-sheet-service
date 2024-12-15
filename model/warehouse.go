@@ -6,7 +6,7 @@ type Warehouse struct {
 	WarehouseID string   `json:"warehouseID"`
 	Name        string   `json:"warehouseName"`
 	Role        string   `json:"role"`
-	Lockers     []Locker `json:"lockers,omitempty"`
+	Lockers     []Locker `json:"lockers"`
 }
 
 type Locker struct {
@@ -23,6 +23,10 @@ type UpdateWarehouseRequest struct {
 	WarehouseName string `json:"warehouseName" validate:"required"`
 }
 
+type DeleteWarehouseRequest struct {
+	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+}
+
 type CreateWarehouseLockerRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 	LockerName  string `json:"lockerName" validate:"required"`
@@ -32,6 +36,11 @@ type UpdateWarehouseLockerRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 	LockerID    string `param:"lockerID" validate:"required,uuid"`
 	LockerName  string `json:"lockerName" validate:"required"`
+}
+
+type DeleteWarehouseLockerRequest struct {
+	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	LockerID    string `param:"lockerName" validate:"required,uuid"`
 }
 
 type GetWarehouseUserRequest struct {
