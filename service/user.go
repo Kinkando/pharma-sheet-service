@@ -50,18 +50,12 @@ func (s *user) GetUserInfo(ctx context.Context) (user model.User, err error) {
 		return
 	}
 
-	authUser, err := s.firebaseAuthen.GetUser(ctx, *userInfo.FirebaseUID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return
-	}
-
 	user = model.User{
 		UserID:      userInfo.UserID.String(),
 		FirebaseUID: userInfo.FirebaseUID,
 		Email:       userInfo.Email,
-		ImageURL:    authUser.PhotoURL,
-		DisplayName: authUser.DisplayName,
+		ImageURL:    userInfo.ImageURL,
+		DisplayName: userInfo.DisplayName,
 	}
 
 	return user, nil
