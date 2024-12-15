@@ -9,6 +9,8 @@ CREATE TABLE users (
   user_id UUID PRIMARY KEY,
   firebase_uid TEXT UNIQUE,
   email TEXT UNIQUE NOT NULL,
+  display_name TEXT,
+  image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ
 );
@@ -37,7 +39,8 @@ CREATE TABLE lockers (
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
-  CONSTRAINT fk_locker_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id)
+  CONSTRAINT fk_locker_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id),
+  CONSTRAINT unique_locker UNIQUE (warehouse_id, name)
 );
 
 CREATE TABLE medicines (

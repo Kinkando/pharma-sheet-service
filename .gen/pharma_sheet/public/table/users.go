@@ -22,6 +22,8 @@ type usersTable struct {
 	Email       postgres.ColumnString
 	CreatedAt   postgres.ColumnTimestampz
 	UpdatedAt   postgres.ColumnTimestampz
+	DisplayName postgres.ColumnString
+	ImageURL    postgres.ColumnString
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -67,8 +69,10 @@ func newUsersTableImpl(schemaName, tableName, alias string) usersTable {
 		EmailColumn       = postgres.StringColumn("email")
 		CreatedAtColumn   = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn   = postgres.TimestampzColumn("updated_at")
-		allColumns        = postgres.ColumnList{UserIDColumn, FirebaseUIDColumn, EmailColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns    = postgres.ColumnList{FirebaseUIDColumn, EmailColumn, CreatedAtColumn, UpdatedAtColumn}
+		DisplayNameColumn = postgres.StringColumn("display_name")
+		ImageURLColumn    = postgres.StringColumn("image_url")
+		allColumns        = postgres.ColumnList{UserIDColumn, FirebaseUIDColumn, EmailColumn, CreatedAtColumn, UpdatedAtColumn, DisplayNameColumn, ImageURLColumn}
+		mutableColumns    = postgres.ColumnList{FirebaseUIDColumn, EmailColumn, CreatedAtColumn, UpdatedAtColumn, DisplayNameColumn, ImageURLColumn}
 	)
 
 	return usersTable{
@@ -80,6 +84,8 @@ func newUsersTableImpl(schemaName, tableName, alias string) usersTable {
 		Email:       EmailColumn,
 		CreatedAt:   CreatedAtColumn,
 		UpdatedAt:   UpdatedAtColumn,
+		DisplayName: DisplayNameColumn,
+		ImageURL:    ImageURLColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

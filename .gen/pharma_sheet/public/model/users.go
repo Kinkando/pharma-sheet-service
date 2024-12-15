@@ -18,4 +18,6 @@ type Users struct {
 	Email       string
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
+	DisplayName *string
+	ImageURL    *string
 }
