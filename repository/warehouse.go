@@ -186,6 +186,7 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 			table.Users.ImageURL,
 		).
 		WHERE(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
+		ORDER_BY(table.Users.Email.ASC()).
 		Sql()
 
 	rows, err := r.pgPool.Query(ctx, query, args...)
