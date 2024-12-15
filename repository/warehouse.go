@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -30,7 +31,7 @@ type Warehouse interface {
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
 	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error
-	UpdateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
+	UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error
 	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
 }
 
@@ -301,21 +302,29 @@ func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID
 	return nil
 }
 
-func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error {
+func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error {
 	warehouseUsers := table.WarehouseUsers
 
-	now := time.Now()
-	warehouse := genmodel.WarehouseUsers{
-		WarehouseID: uuid.MustParse(warehouseID),
-		UserID:      uuid.MustParse(userID),
-		Role:        role,
-		UpdatedAt:   &now,
+	if warehouseUser.Role == "" && warehouseUser.Status == "" {
+		return errors.New("no specific column is update")
+	}
+
+	columnNames := postgres.ColumnList{warehouseUsers.UpdatedAt}
+	columnValues := []any{postgres.TimestampzT(time.Now())}
+
+	if warehouseUser.Role != "" {
+		columnNames = append(columnNames, warehouseUsers.Role)
+		columnValues = append(columnValues, warehouseUser.Role)
+	}
+	if warehouseUser.Status != "" {
+		columnNames = append(columnNames, warehouseUsers.Status)
+		columnValues = append(columnValues, warehouseUser.Status)
 	}
 
 	stmt, args := warehouseUsers.
-		UPDATE(warehouseUsers.Role, warehouseUsers.UpdatedAt).
-		WHERE(warehouseUsers.WarehouseID.EQ(postgres.UUID(warehouse.WarehouseID)).AND(warehouseUsers.UserID.EQ(postgres.UUID(warehouse.UserID)))).
-		MODEL(warehouse).
+		UPDATE(columnNames).
+		SET(columnValues[0], columnValues[1:]...).
+		WHERE(warehouseUsers.WarehouseID.EQ(postgres.UUID(warehouseUser.WarehouseID)).AND(warehouseUsers.UserID.EQ(postgres.UUID(warehouseUser.UserID)))).
 		Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {

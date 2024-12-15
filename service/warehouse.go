@@ -399,7 +399,11 @@ func (s *warehouse) UpdateWarehouseUser(ctx context.Context, req model.UpdateWar
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "grant yourself is not allowed"})
 	}
 
-	err = s.warehouseRepository.UpdateWarehouseUser(ctx, req.WarehouseID, req.UserID, req.Role)
+	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.WarehouseUsers{
+		WarehouseID: uuid.MustParse(req.WarehouseID),
+		UserID:      uuid.MustParse(req.UserID),
+		Role:        req.Role,
+	})
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
