@@ -18,4 +18,5 @@ type WarehouseUsers struct {
 	Role        Role
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
+	Status      ApprovalStatus
 }

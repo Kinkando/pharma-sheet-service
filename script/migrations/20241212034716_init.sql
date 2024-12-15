@@ -1,4 +1,9 @@
 -- migrate:up
+CREATE TYPE approval_status AS ENUM (
+  'APPROVED',
+  'PENDING'
+)
+
 CREATE TYPE role AS ENUM (
   'ADMIN',
   'EDITOR',
@@ -26,6 +31,7 @@ CREATE TABLE warehouse_users (
   warehouse_id UUID NOT NULL,
   user_id UUID NOT NULL,
   role role NOT NULL,
+  status approval_status NOT NULL DEFAULT 'PENDING',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
   CONSTRAINT fk_warehouse_user_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id),
@@ -67,3 +73,4 @@ DROP TABLE IF EXISTS warehouse_users;
 DROP TABLE IF EXISTS warehouses;
 DROP TABLE IF EXISTS users;
 DROP TYPE role;
+DROP TYPE approval_status;
