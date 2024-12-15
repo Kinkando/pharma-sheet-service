@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"path/filepath"
 	"time"
 
@@ -25,6 +26,7 @@ type Storage interface {
 	RemoveFile(ctx context.Context, path string) error
 	SetPublic(ctx context.Context, fileName string) error
 	GetPublicUrl(fileName string) string
+	GetUrl(fileName string) (string, error)
 	Shutdown()
 }
 
@@ -100,7 +102,7 @@ func (s *storage) RemoveFile(ctx context.Context, path string) error {
 func (s *storage) getSignedUrl(objectName string) (fileURL string, err error) {
 	opts := &cloudStorage.SignedURLOptions{
 		Scheme:         cloudStorage.SigningSchemeV4,
-		Method:         "GET",
+		Method:         http.MethodGet,
 		GoogleAccessID: s.config.Email,
 		PrivateKey:     s.config.PrivateKey,
 		Expires:        time.Now().Add(s.expireTime),
@@ -123,6 +125,10 @@ func (s *storage) SetPublic(ctx context.Context, fileName string) error {
 
 func (s *storage) GetPublicUrl(fileName string) (publicUrl string) {
 	return GoogleCloudStorageBaseURL + "/" + s.bucketName + "/" + fileName
+}
+
+func (s *storage) GetUrl(fileName string) (string, error) {
+	return s.getSignedUrl(fileName)
 }
 
 func (s *storage) Shutdown() {

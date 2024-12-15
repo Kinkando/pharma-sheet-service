@@ -291,7 +291,11 @@ func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 		user, index := warehouseUsers[index], index
 		if user.ImageURL != nil {
 			conc.Go(func(ctx context.Context) error {
-				url := s.storage.GetPublicUrl(*user.ImageURL)
+				url, err := s.storage.GetUrl(*user.ImageURL)
+				if err != nil {
+					logger.Context(ctx).Error(err)
+					return err
+				}
 				warehouseUsers[index].ImageURL = &url
 
 				return nil
