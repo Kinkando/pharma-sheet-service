@@ -34,6 +34,7 @@ func (r *locker) GetLockers(ctx context.Context, warehouseID string) (lockers []
 	query, args := table.Lockers.
 		SELECT(table.Lockers.LockerID, table.Lockers.WarehouseID, table.Lockers.Name).
 		WHERE(table.Lockers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
+		ORDER_BY(table.Lockers.CreatedAt.ASC()).
 		Sql()
 
 	rows, err := r.pgPool.Query(ctx, query, args...)
