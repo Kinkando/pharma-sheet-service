@@ -10,6 +10,7 @@ import (
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/labstack/echo/v4"
 	"github.com/sourcegraph/conc/pool"
@@ -23,22 +24,26 @@ type Warehouse interface {
 	UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
+	UpdateWarehouseUsers(ctx context.Context, req model.UpdateWarehouseUserRequest) error
 }
 
 type warehouse struct {
 	warehouseRepository repository.Warehouse
 	lockerRepository    repository.Locker
+	userRepository      repository.User
 	firebaseAuthen      *auth.Client
 }
 
 func NewWarehouseService(
 	warehouseRepository repository.Warehouse,
 	lockerRepository repository.Locker,
+	userRepository repository.User,
 	firebaseAuthen *auth.Client,
 ) Warehouse {
 	return &warehouse{
 		warehouseRepository: warehouseRepository,
 		lockerRepository:    lockerRepository,
+		userRepository:      userRepository,
 		firebaseAuthen:      firebaseAuthen,
 	}
 }
@@ -123,7 +128,12 @@ func (s *warehouse) UpdateWarehouseLocker(ctx context.Context, req model.UpdateW
 }
 
 func (s *warehouse) checkWarehouseManagementRole(ctx context.Context, warehouseID string, roles ...genmodel.Role) (err error) {
-	role, err := s.warehouseRepository.GetWarehouseRole(ctx, warehouseID)
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return
+	}
+
+	role, err := s.warehouseRepository.GetWarehouseRole(ctx, warehouseID, userProfile.UserID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -166,4 +176,28 @@ func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	}
 
 	return warehouseUsers, nil
+}
+
+func (s *warehouse) UpdateWarehouseUsers(ctx context.Context, req model.UpdateWarehouseUserRequest) error {
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+	}
+
+	if req.UserID == userProfile.UserID {
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "grant yourself is not allowed"})
+	}
+
+	err = s.warehouseRepository.UpdateWarehouseUsers(ctx, req.WarehouseID, req.UserID, req.Role)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return nil
 }

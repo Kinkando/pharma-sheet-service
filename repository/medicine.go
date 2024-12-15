@@ -14,11 +14,10 @@ import (
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
-	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 )
 
 type Medicine interface {
-	GetMedicineRole(ctx context.Context, medicineID string) (genmodel.Role, error)
+	GetMedicineRole(ctx context.Context, medicineID, userID string) (genmodel.Role, error)
 	GetMedicine(ctx context.Context, medicineID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicineID string, err error)
@@ -34,16 +33,11 @@ func NewMedicineRepository(pgPool *pgxpool.Pool) Medicine {
 	return &medicine{pgPool: pgPool}
 }
 
-func (r *medicine) GetMedicineRole(ctx context.Context, medicineID string) (role genmodel.Role, err error) {
-	userProfile, err := profile.UseProfile(ctx)
-	if err != nil {
-		return
-	}
-
+func (r *medicine) GetMedicineRole(ctx context.Context, medicineID, userID string) (role genmodel.Role, err error) {
 	query, args := table.WarehouseUsers.
 		INNER_JOIN(table.Medicines, table.WarehouseUsers.WarehouseID.EQ(table.Medicines.WarehouseID)).
 		SELECT(table.WarehouseUsers.Role).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID)))).
+		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID)))).
 		Sql()
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&role)

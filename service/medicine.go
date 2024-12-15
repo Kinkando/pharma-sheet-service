@@ -11,6 +11,7 @@ import (
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/labstack/echo/v4"
 )
@@ -195,16 +196,21 @@ func (s *medicine) DeleteMedicine(ctx context.Context, medicineID string) error 
 }
 
 func (s *medicine) checkWarehouseManagementRole(ctx context.Context, id string, idType string, roles ...genmodel.Role) (err error) {
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return
+	}
+
 	var role genmodel.Role
 	switch idType {
 	case idTypeMedicine:
-		role, err = s.medicineRepository.GetMedicineRole(ctx, id)
+		role, err = s.medicineRepository.GetMedicineRole(ctx, id, userProfile.UserID)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 		}
 	case idTypeWarehouse:
-		role, err = s.warehouseRepository.GetWarehouseRole(ctx, id)
+		role, err = s.warehouseRepository.GetWarehouseRole(ctx, id, userProfile.UserID)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})

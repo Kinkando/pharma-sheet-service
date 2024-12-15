@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/go-jet/jet/v2/postgres"
@@ -19,11 +20,12 @@ import (
 
 type Warehouse interface {
 	GetWarehouses(ctx context.Context) ([]model.Warehouse, error)
-	GetWarehouseRole(ctx context.Context, warehouseID string) (genmodel.Role, error)
+	GetWarehouseRole(ctx context.Context, warehouseID, userID string) (genmodel.Role, error)
 	CreateWarehouse(ctx context.Context, req model.Warehouse) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
 
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
+	UpdateWarehouseUsers(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
 }
 
 type warehouse struct {
@@ -141,15 +143,10 @@ func (r *warehouse) UpdateWarehouse(ctx context.Context, req model.Warehouse) er
 	return nil
 }
 
-func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID string) (role genmodel.Role, err error) {
-	userProfile, err := profile.UseProfile(ctx)
-	if err != nil {
-		return
-	}
-
+func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID string) (role genmodel.Role, err error) {
 	query, args := table.WarehouseUsers.
 		SELECT(table.WarehouseUsers.Role).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID)))).
+		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID)))).
 		Sql()
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&role)
@@ -196,4 +193,33 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	}
 
 	return warehouseUsers, nil
+}
+
+func (r *warehouse) UpdateWarehouseUsers(ctx context.Context, warehouseID, userID string, role genmodel.Role) error {
+	warehouseUsers := table.WarehouseUsers
+
+	now := time.Now()
+	warehouse := genmodel.WarehouseUsers{
+		WarehouseID: uuid.MustParse(warehouseID),
+		UserID:      uuid.MustParse(userID),
+		Role:        role,
+		UpdatedAt:   &now,
+	}
+
+	stmt, args := warehouseUsers.
+		UPDATE(warehouseUsers.Role, warehouseUsers.UpdatedAt).
+		WHERE(warehouseUsers.WarehouseID.EQ(postgres.UUID(warehouse.WarehouseID)).AND(warehouseUsers.UserID.EQ(postgres.UUID(warehouse.UserID)))).
+		MODEL(warehouse).
+		Sql()
+	result, err := r.pgPool.Exec(ctx, stmt, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }

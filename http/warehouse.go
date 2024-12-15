@@ -30,6 +30,7 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 
 	warehouseUserRoute := route.Group("/:warehouseID/user")
 	warehouseUserRoute.GET("", handler.getWarehouseUsers)
+	warehouseUserRoute.PUT("/:userID/:role", handler.updateWarehouseUsers)
 }
 
 func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
@@ -165,4 +166,27 @@ func (h *WarehouseHandler) getWarehouseUsers(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, users)
+}
+
+func (h *WarehouseHandler) updateWarehouseUsers(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.UpdateWarehouseUserRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	err := h.warehouseService.UpdateWarehouseUsers(ctx, req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }
