@@ -27,6 +27,7 @@ type Warehouse interface {
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
 	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
 	UpdateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role) error
+	DeleteWarehouseUser(ctx context.Context, warehouseID, userID string) error
 }
 
 type warehouse struct {
@@ -234,6 +235,25 @@ func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseID, userID
 		UPDATE(warehouseUsers.Role, warehouseUsers.UpdatedAt).
 		WHERE(warehouseUsers.WarehouseID.EQ(postgres.UUID(warehouse.WarehouseID)).AND(warehouseUsers.UserID.EQ(postgres.UUID(warehouse.UserID)))).
 		MODEL(warehouse).
+		Sql()
+	result, err := r.pgPool.Exec(ctx, stmt, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID, userID string) error {
+	warehouseUsers := table.WarehouseUsers
+	stmt, args := table.WarehouseUsers.
+		DELETE().
+		WHERE(warehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID))).AND(warehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))))).
 		Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {

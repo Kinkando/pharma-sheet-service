@@ -30,8 +30,9 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 
 	warehouseUserRoute := route.Group("/:warehouseID/user")
 	warehouseUserRoute.GET("", handler.getWarehouseUsers)
-	warehouseUserRoute.POST("", handler.createWarehouseUsers)
-	warehouseUserRoute.PUT("/:userID/:role", handler.updateWarehouseUsers)
+	warehouseUserRoute.POST("", handler.createWarehouseUser)
+	warehouseUserRoute.PUT("/:userID/:role", handler.updateWarehouseUser)
+	warehouseUserRoute.DELETE("/:userID", handler.deleteWarehouseUser)
 }
 
 func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
@@ -169,7 +170,7 @@ func (h *WarehouseHandler) getWarehouseUsers(c echo.Context) error {
 	return c.JSON(http.StatusOK, users)
 }
 
-func (h *WarehouseHandler) createWarehouseUsers(c echo.Context) error {
+func (h *WarehouseHandler) createWarehouseUser(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	var req model.CreateWarehouseUserRequest
@@ -192,7 +193,7 @@ func (h *WarehouseHandler) createWarehouseUsers(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *WarehouseHandler) updateWarehouseUsers(c echo.Context) error {
+func (h *WarehouseHandler) updateWarehouseUser(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	var req model.UpdateWarehouseUserRequest
@@ -207,6 +208,29 @@ func (h *WarehouseHandler) updateWarehouseUsers(c echo.Context) error {
 	}
 
 	err := h.warehouseService.UpdateWarehouseUser(ctx, req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *WarehouseHandler) deleteWarehouseUser(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.DeleteWarehouseUserRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	err := h.warehouseService.DeleteWarehouseUser(ctx, req)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err

@@ -28,6 +28,7 @@ type Warehouse interface {
 	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
 	CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error
 	UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error
+	DeleteWarehouseUser(ctx context.Context, req model.DeleteWarehouseUserRequest) error
 }
 
 type warehouse struct {
@@ -229,6 +230,30 @@ func (s *warehouse) UpdateWarehouseUser(ctx context.Context, req model.UpdateWar
 	}
 
 	err = s.warehouseRepository.UpdateWarehouseUser(ctx, req.WarehouseID, req.UserID, req.Role)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return nil
+}
+
+func (s *warehouse) DeleteWarehouseUser(ctx context.Context, req model.DeleteWarehouseUserRequest) error {
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+	}
+
+	if req.UserID == userProfile.UserID {
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "delete yourself is not allowed"})
+	}
+
+	err = s.warehouseRepository.DeleteWarehouseUser(ctx, req.WarehouseID, req.UserID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
