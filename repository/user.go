@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-jet/jet/v2/postgres"
@@ -42,7 +43,7 @@ func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.User
 		conditions = append(conditions, users.FirebaseUID.EQ(postgres.String(*filter.FirebaseUID)))
 	}
 	if filter.Email != "" {
-		conditions = append(conditions, users.Email.EQ(postgres.String(filter.Email)))
+		conditions = append(conditions, postgres.LOWER(users.Email).EQ(postgres.String(strings.ToLower(filter.Email))))
 	}
 
 	if len(conditions) == 0 {
