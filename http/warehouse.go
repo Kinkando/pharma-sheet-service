@@ -27,6 +27,9 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 	route.PATCH("/:warehouseID", handler.updateWarehouse)
 	route.POST("/:warehouseID/locker", handler.createWarehouseLocker)
 	route.PATCH("/:warehouseID/locker/:lockerID", handler.updateWarehouseLocker)
+
+	warehouseUserRoute := route.Group("/:warehouseID/user")
+	warehouseUserRoute.GET("", handler.getWarehouseUsers)
 }
 
 func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
@@ -85,7 +88,7 @@ func (h *WarehouseHandler) updateWarehouse(c echo.Context) error {
 	err := h.warehouseService.UpdateWarehouse(ctx, req)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		return err
 	}
 
 	return c.NoContent(http.StatusNoContent)
@@ -108,7 +111,7 @@ func (h *WarehouseHandler) createWarehouseLocker(c echo.Context) error {
 	lockerID, err := h.warehouseService.CreateWarehouseLocker(ctx, req)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		return err
 	}
 
 	return c.JSON(http.StatusOK, echo.Map{"lockerID": lockerID})
@@ -131,8 +134,35 @@ func (h *WarehouseHandler) updateWarehouseLocker(c echo.Context) error {
 	err := h.warehouseService.UpdateWarehouseLocker(ctx, req)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		return err
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *WarehouseHandler) getWarehouseUsers(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.GetWarehouseUserRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	users, err := h.warehouseService.GetWarehouseUsers(ctx, req.WarehouseID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	if len(users) == 0 {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "warehouse id not found"})
+	}
+
+	return c.JSON(http.StatusOK, users)
 }

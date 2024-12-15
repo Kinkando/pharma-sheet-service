@@ -25,25 +25,25 @@ type authen struct {
 	userRepository  repository.User
 	cacheRepository repository.Cache
 	jwtService      JWTService
-	firebseAuthen   *auth.Client
+	firebaseAuthen  *auth.Client
 }
 
 func NewAuthenService(
 	userRepository repository.User,
 	cacheRepository repository.Cache,
 	jwtService JWTService,
-	firebseAuthen *auth.Client,
+	firebaseAuthen *auth.Client,
 ) Authen {
 	return &authen{
 		userRepository:  userRepository,
 		cacheRepository: cacheRepository,
 		jwtService:      jwtService,
-		firebseAuthen:   firebseAuthen,
+		firebaseAuthen:  firebaseAuthen,
 	}
 }
 
 func (s *authen) VerifyToken(ctx context.Context, idToken string) (model.JWT, error) {
-	token, err := s.firebseAuthen.VerifyIDTokenAndCheckRevoked(ctx, idToken)
+	token, err := s.firebaseAuthen.VerifyIDTokenAndCheckRevoked(ctx, idToken)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return model.JWT{}, err

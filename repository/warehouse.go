@@ -22,6 +22,8 @@ type Warehouse interface {
 	GetWarehouseRole(ctx context.Context, warehouseID string) (genmodel.Role, error)
 	CreateWarehouse(ctx context.Context, req model.Warehouse) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
+
+	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
 }
 
 type warehouse struct {
@@ -157,4 +159,41 @@ func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID string) (r
 	}
 
 	return role, nil
+}
+
+func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (warehouseUsers []model.WarehouseUser, err error) {
+	query, args := table.WarehouseUsers.
+		INNER_JOIN(table.Users, table.WarehouseUsers.UserID.EQ(table.Users.UserID)).
+		SELECT(
+			table.WarehouseUsers.UserID,
+			table.WarehouseUsers.Role,
+			table.Users.FirebaseUID,
+			table.Users.Email,
+		).
+		WHERE(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var warehouseUser model.WarehouseUser
+		err = rows.Scan(
+			&warehouseUser.UserID,
+			&warehouseUser.Role,
+			&warehouseUser.FirebaseUID,
+			&warehouseUser.Email,
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, err
+		}
+		warehouseUsers = append(warehouseUsers, warehouseUser)
+	}
+
+	return warehouseUsers, nil
 }

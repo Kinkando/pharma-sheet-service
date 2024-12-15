@@ -19,16 +19,16 @@ type User interface {
 
 type user struct {
 	userRepository repository.User
-	firebseAuthen  *auth.Client
+	firebaseAuthen *auth.Client
 }
 
 func NewUserService(
 	userRepository repository.User,
-	firebseAuthen *auth.Client,
+	firebaseAuthen *auth.Client,
 ) User {
 	return &user{
 		userRepository: userRepository,
-		firebseAuthen:  firebseAuthen,
+		firebaseAuthen: firebaseAuthen,
 	}
 }
 
@@ -50,7 +50,7 @@ func (s *user) GetUserInfo(ctx context.Context) (user model.User, err error) {
 		return
 	}
 
-	authUser, err := s.firebseAuthen.GetUser(ctx, *userInfo.FirebaseUID)
+	authUser, err := s.firebaseAuthen.GetUser(ctx, *userInfo.FirebaseUID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return
