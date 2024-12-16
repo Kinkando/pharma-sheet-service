@@ -63,8 +63,12 @@ type DeleteWarehouseLockerRequest struct {
 	LockerID    string `param:"lockerID" validate:"required,uuid"`
 }
 
-type GetWarehouseUserRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+type FilterWarehouseUser struct {
+	Pagination
+	WarehouseID string               `param:"warehouseID" validate:"required,uuid"`
+	Search      string               `query:"search"`
+	Status      model.ApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
+	Role        model.Role           `query:"role" validate:"omitempty,oneof=ADMIN EDITOR VIEWER"`
 }
 
 type CreateWarehouseUserRequest struct {

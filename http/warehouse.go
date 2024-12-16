@@ -221,28 +221,25 @@ func (h *WarehouseHandler) deleteWarehouseLocker(c echo.Context) error {
 func (h *WarehouseHandler) getWarehouseUsers(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req model.GetWarehouseUserRequest
+	var req model.FilterWarehouseUser
 	if err := c.Bind(&req); err != nil {
 		logger.Context(ctx).Error(err)
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
+	req.AssignDefault()
 
 	if err := h.validate.Struct(req); err != nil {
 		logger.Context(ctx).Error(err)
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	users, err := h.warehouseService.GetWarehouseUsers(ctx, req.WarehouseID)
+	data, err := h.warehouseService.GetWarehouseUsers(ctx, req.WarehouseID, req)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
 	}
 
-	if len(users) == 0 {
-		return c.JSON(http.StatusNotFound, echo.Map{"error": "warehouse id not found"})
-	}
-
-	return c.JSON(http.StatusOK, users)
+	return c.JSON(http.StatusOK, data)
 }
 
 func (h *WarehouseHandler) approveUser(c echo.Context) error {

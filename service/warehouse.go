@@ -30,7 +30,7 @@ type Warehouse interface {
 	UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error
 	DeleteWarehouseLocker(ctx context.Context, req model.DeleteWarehouseLockerRequest) error
 
-	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
+	GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (model.PagingWithMetadata[model.WarehouseUser], error)
 	CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error
 	UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error
 	DeleteWarehouseUser(ctx context.Context, req model.DeleteWarehouseUserRequest) error
@@ -323,16 +323,16 @@ func (s *warehouse) checkWarehouseManagementRole(ctx context.Context, warehouseI
 	return nil
 }
 
-func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error) {
-	warehouseUsers, err := s.warehouseRepository.GetWarehouseUsers(ctx, warehouseID)
+func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (res model.PagingWithMetadata[model.WarehouseUser], err error) {
+	data, total, err := s.warehouseRepository.GetWarehouseUsers(ctx, warehouseID, filter)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
 	conc := pool.New().WithContext(ctx).WithMaxGoroutines(5).WithCancelOnError()
-	for index := range warehouseUsers {
-		user, index := warehouseUsers[index], index
+	for index := range data {
+		user, index := data[index], index
 		if user.ImageURL != nil {
 			conc.Go(func(ctx context.Context) error {
 				url, err := s.storage.GetUrl(*user.ImageURL)
@@ -340,7 +340,7 @@ func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 					logger.Context(ctx).Error(err)
 					return err
 				}
-				warehouseUsers[index].ImageURL = &url
+				data[index].ImageURL = &url
 
 				return nil
 			})
@@ -348,10 +348,11 @@ func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 	}
 	if err = conc.Wait(); err != nil {
 		logger.Context(ctx).Error(err)
-		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	return warehouseUsers, nil
+	res = model.PaginationResponse(data, filter.Pagination, total)
+	return res, nil
 }
 
 func (s *warehouse) CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error {

@@ -29,7 +29,7 @@ type Warehouse interface {
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
 	DeleteWarehouse(ctx context.Context, warehouseID string) error
 
-	GetWarehouseUsers(ctx context.Context, warehouseID string) ([]model.WarehouseUser, error)
+	GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (data []model.WarehouseUser, total uint64, err error)
 	GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (genmodel.ApprovalStatus, error)
 	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error
 	UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error
@@ -240,8 +240,41 @@ func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID st
 	return role, nil
 }
 
-func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (warehouseUsers []model.WarehouseUser, err error) {
+func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (warehouseUsers []model.WarehouseUser, total uint64, err error) {
+	condition := table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))
+
+	if filter.Role != "" {
+		condition = condition.AND(table.WarehouseUsers.Role.EQ(postgres.NewEnumValue(string(filter.Role))))
+	}
+	if filter.Status != "" {
+		condition = condition.AND(table.WarehouseUsers.Status.EQ(postgres.NewEnumValue(string(filter.Status))))
+	}
+	if strings.TrimSpace(filter.Search) != "" {
+		search := postgres.String("%" + strings.ToLower(filter.Search) + "%")
+		condition = condition.AND(
+			postgres.OR(
+				postgres.LOWER(table.Users.DisplayName).LIKE(search),
+				postgres.LOWER(table.Users.Email).LIKE(search),
+			),
+		)
+	}
+
 	query, args := table.WarehouseUsers.
+		INNER_JOIN(table.Users, table.WarehouseUsers.UserID.EQ(table.Users.UserID)).
+		SELECT(postgres.COUNT(postgres.STAR)).
+		WHERE(condition).
+		Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&total)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	if total == 0 {
+		return
+	}
+
+	query, args = table.WarehouseUsers.
 		INNER_JOIN(table.Users, table.WarehouseUsers.UserID.EQ(table.Users.UserID)).
 		SELECT(
 			table.WarehouseUsers.UserID,
@@ -252,7 +285,9 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 			table.Users.ImageURL,
 			table.WarehouseUsers.Status,
 		).
-		WHERE(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
+		WHERE(condition).
+		LIMIT(int64(filter.Limit)).
+		OFFSET(int64(filter.Offset)).
 		ORDER_BY(table.Users.Email.ASC()).
 		Sql()
 
@@ -276,12 +311,12 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string) (
 		)
 		if err != nil {
 			logger.Context(ctx).Error(err)
-			return nil, err
+			return
 		}
 		warehouseUsers = append(warehouseUsers, warehouseUser)
 	}
 
-	return warehouseUsers, nil
+	return warehouseUsers, total, nil
 }
 
 func (r *warehouse) GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (status genmodel.ApprovalStatus, err error) {
