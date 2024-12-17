@@ -83,7 +83,11 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 		return
 	}
 
-	condition := table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))
+	condition := postgres.Bool(true)
+	if filter.MyWarehouse {
+		condition = condition.AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved)))
+	}
+
 	if filter.Search != "" {
 		search := postgres.String("%" + strings.ToLower(filter.Search) + "%")
 		condition = condition.AND(postgres.LOWER(table.Warehouses.Name).LIKE(search))
@@ -106,7 +110,7 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 
 	query, args = table.Warehouses.
 		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
-		SELECT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.WarehouseUsers.Role).
+		SELECT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.WarehouseUsers.Role, table.WarehouseUsers.Status).
 		WHERE(condition).
 		LIMIT(int64(filter.Limit)).
 		OFFSET(int64(filter.Offset)).
@@ -122,7 +126,7 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 
 	for rows.Next() {
 		var warehouse model.WarehouseDetail
-		err = rows.Scan(&warehouse.WarehouseID, &warehouse.Name, &warehouse.Role)
+		err = rows.Scan(&warehouse.WarehouseID, &warehouse.Name, &warehouse.Role, &warehouse.Status)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return nil, 0, err
