@@ -93,6 +93,10 @@ type ApprovalWarehouseUserRequest struct {
 	UserID      string `param:"userID" validate:"required,uuid"`
 }
 
+type JoinWarehouseRequest struct {
+	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+}
+
 type WarehouseUser struct {
 	User
 	Role   model.Role           `json:"role"`

@@ -6,6 +6,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/service"
 	"github.com/labstack/echo/v4"
 )
@@ -36,6 +37,7 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 	warehouseUserRoute.PATCH("/:userID/approve", handler.approveUser)
 	warehouseUserRoute.PATCH("/:userID/reject", handler.rejectUser)
 	warehouseUserRoute.POST("", handler.createWarehouseUser)
+	warehouseUserRoute.POST("/join", handler.joinWarehouse)
 	warehouseUserRoute.PUT("/:userID/:role", handler.updateWarehouseUser)
 	warehouseUserRoute.DELETE("/:userID", handler.deleteWarehouseUser)
 }
@@ -240,6 +242,34 @@ func (h *WarehouseHandler) getWarehouseUsers(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, data)
+}
+
+func (h *WarehouseHandler) joinWarehouse(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.JoinWarehouseRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+	}
+
+	err = h.warehouseService.JoinWarehouse(ctx, req.WarehouseID, userProfile.UserID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *WarehouseHandler) approveUser(c echo.Context) error {
