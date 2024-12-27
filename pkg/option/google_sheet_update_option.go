@@ -19,13 +19,13 @@ func (f googleSheetUpdateOptionFunc) Apply(o *GoogleSheetUpdate) {
 	f(o)
 }
 
-func WithGoogleSheetUpdateID(sheetID int64) GoogleSheetUpdateOption {
+func WithGoogleSheetUpdateSheetID(sheetID int64) GoogleSheetUpdateOption {
 	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
 		o.SheetID = sheetID
 	})
 }
 
-func WithGoogleSheetUpdateTitle(title string) GoogleSheetUpdateOption {
+func WithGoogleSheetUpdateSheetTitle(title string) GoogleSheetUpdateOption {
 	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
 		o.SheetTitle = title
 	})
@@ -91,6 +91,13 @@ func WithGoogleSheetUpdateIsTextWraping(isTextWraping bool) GoogleSheetUpdateOpt
 	})
 }
 
+// ColumnStartIndex is 1-based index: A=1, B=2, C=3, ...
+func WithGoogleSheetUpdateColumnStartIndex(columnStartIndex int64) GoogleSheetUpdateOption {
+	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
+		o.ColumnStartIndex = columnStartIndex
+	})
+}
+
 type GoogleSheetUpdate struct {
 	SheetID          int64
 	SheetTitle       string
@@ -102,6 +109,8 @@ type GoogleSheetUpdate struct {
 	Data         [][]GoogleSheetUpdateData
 	IsAppendData bool
 
+	// ColumnStartIndex is 1-based index: A=1, B=2, C=3, ...
+	ColumnStartIndex    int64
 	Columns             []GoogleSheetUpdateColumn
 	ApplyFilter         bool
 	IsAutoResizeColumns bool

@@ -38,6 +38,7 @@ type Sheet interface {
 	Get(ctx context.Context, spreadsheetID string) (*sheets.Spreadsheet, error)
 	Update(ctx context.Context, spreadsheetID string, opts ...options.GoogleSheetUpdateOption) error
 	RenameSheet(ctx context.Context, spreadsheetID string, sheetId int64, title string) error
+	ReadColumns(ctx context.Context, sheet *sheets.Sheet, opts ...options.GoogleSheetReadColumnOption) ([]string, error)
 	Read(ctx context.Context, sheet *sheets.Sheet, data any, opts ...options.GoogleSheetReadOption) ([]byte, error)
 	Write(ctx context.Context, data any, opts ...options.GoogleSheetWriteOption) ([][]options.GoogleSheetUpdateData, error)
 }
@@ -173,6 +174,7 @@ func (g *googleSheet) Update(ctx context.Context, spreadsheetID string, opts ...
 		StartCellRange:   "A1",
 		EndCellRange:     "A1",
 		FontSize:         10,
+		ColumnStartIndex: 1,
 	}
 	for _, o := range opts {
 		o.Apply(opt)
@@ -219,6 +221,54 @@ func (g *googleSheet) RenameSheet(ctx context.Context, spreadsheetID string, she
 		return fmt.Errorf("google: sheet: RenameSheet: unable to rename sheet: %v", err)
 	}
 	return nil
+}
+
+func (g *googleSheet) ReadColumns(ctx context.Context, sheet *sheets.Sheet, opts ...options.GoogleSheetReadColumnOption) ([]string, error) {
+	opt := &options.GoogleSheetReadColumn{
+		IncludeValidData: true,
+	}
+	for _, o := range opts {
+		o.Apply(opt)
+	}
+
+	if len(sheet.Data) == 0 || len(sheet.Data[0].RowData) == 0 {
+		return nil, nil
+	}
+
+	var columnNames []string
+	for _, cell := range sheet.Data[0].RowData[0].Values {
+		if cell.FormattedValue == "" && opt.ExcludeEmptyColumn {
+			continue
+		}
+		columnNames = append(columnNames, cell.FormattedValue)
+	}
+
+	if opt.ExcludeEmptyColumn {
+		return columnNames, nil
+	}
+
+	if opt.IncludeValidData && len(sheet.Data[0].RowData) > 1 {
+		max := math.MinInt64
+		for _, rowData := range sheet.Data[0].RowData[1:] {
+			lastValidColumn := 0
+			for index, cell := range rowData.Values {
+				if cell.FormattedValue != "" {
+					lastValidColumn = index
+				}
+			}
+			if lastValidColumn+1 > max {
+				max = lastValidColumn + 1
+			}
+		}
+		for i := len(columnNames); i < max; i++ {
+			columnNames = append(columnNames, "")
+		}
+		if len(columnNames) > max {
+			columnNames = columnNames[:max]
+		}
+	}
+
+	return columnNames, nil
 }
 
 // unmarshal google sheet to struct
@@ -420,7 +470,7 @@ func (g *googleSheet) getSheet(ctx context.Context, spreadsheetID, sheetTitle st
 }
 
 func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *options.GoogleSheetUpdate) error {
-	cellRange := "A1:" + fmt.Sprintf("%s1", ColumnNumberToLetter(len(opt.Columns)))
+	cellRange := fmt.Sprintf("%s1:%s1", ColumnNumberToLetter(int(opt.ColumnStartIndex)), ColumnNumberToLetter(len(opt.Columns)+int(opt.ColumnStartIndex)-1))
 	sheetRange := fmt.Sprintf("%s!%s", opt.SheetTitle, cellRange)
 	columns := []any{}
 	for _, column := range opt.Columns {
