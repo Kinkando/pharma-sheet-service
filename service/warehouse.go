@@ -589,6 +589,17 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "sheetID is not found"})
 	}
 
+	warehouseSheet := genmodel.WarehouseSheets{
+		WarehouseID:   uuid.MustParse(req.WarehouseID),
+		SpreadsheetID: spreadsheetID,
+		SheetID:       sheetID,
+	}
+	err = s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
 	var medicineSheets []model.MedicineSheet
 	_, err = s.sheet.Read(ctx, sheet, &medicineSheets)
 	if err != nil {
@@ -716,13 +727,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 		}
 	}
-
-	warehouseSheet := genmodel.WarehouseSheets{
-		WarehouseID:   uuid.MustParse(req.WarehouseID),
-		SpreadsheetID: spreadsheetID,
-		SheetID:       sheetID,
-	}
-	return s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
+	return nil
 }
 
 func extractSpreadsheetInfo(url string) (string, int32, error) {
