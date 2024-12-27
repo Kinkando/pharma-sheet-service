@@ -73,7 +73,8 @@ CREATE TABLE warehouse_sheets (
   sheet_id INT NOT NULL,
   latest_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id)
+  CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id),
+  CONSTRAINT unique_warehouse_sheet UNIQUE (spreadsheet_id, sheet_id)
 )
 
 -- migrate:down

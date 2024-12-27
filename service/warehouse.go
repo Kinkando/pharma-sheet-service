@@ -244,6 +244,8 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, req model.DeleteWarehou
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
+	s.warehouseRepository.DeleteWarehouseSheet(ctx, req.WarehouseID)
+
 	err = s.warehouseRepository.DeleteWarehouse(ctx, req.WarehouseID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -608,6 +610,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 			ctx,
 			spreadsheetID,
 			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
+			option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
 			option.WithGoogleSheetUpdateColumns([]option.GoogleSheetUpdateColumn{{Value: "รหัส", Width: 500}}),
 			option.WithGoogleSheetUpdateColumnStartIndex(int64(columnIDIndex)+1),
 			option.WithGoogleSheetUpdateIsTextWraping(true),
@@ -699,6 +702,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 			ctx,
 			spreadsheetID,
 			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
+			option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
 			option.WithGoogleSheetUpdateData([][]option.GoogleSheetUpdateData{{{Value: medicineID}}}),
 			option.WithGoogleSheetUpdateIsTextWraping(true),
 			option.WithGoogleSheetUpdateFontSize(20),

@@ -38,6 +38,7 @@ type Warehouse interface {
 	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
 
 	UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.WarehouseSheets) error
+	DeleteWarehouseSheet(ctx context.Context, warehouseID string) error
 }
 
 type warehouse struct {
@@ -506,6 +507,21 @@ func (r *warehouse) UpsertWarehouseSheet(ctx context.Context, warehouseSheet gen
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
+	}
+
+	return nil
+}
+
+func (r *warehouse) DeleteWarehouseSheet(ctx context.Context, warehouseID string) error {
+	stmt, args := table.WarehouseSheets.DELETE().WHERE(table.WarehouseSheets.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
+	result, err := r.pgPool.Exec(ctx, stmt, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return sql.ErrNoRows
 	}
 
 	return nil
