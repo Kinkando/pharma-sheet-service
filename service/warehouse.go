@@ -642,7 +642,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		medicineMapping[medicine.MedicineID] = medicine
 	}
 
-	rateLimit := ratelimit.New(30, ratelimit.Per(time.Minute))
+	rateLimit := ratelimit.New(20, ratelimit.Per(time.Minute))
 	for index, medicineSheet := range medicineSheets {
 		locker, ok := lockerID[medicineSheet.LockerName]
 		if !ok {
@@ -658,8 +658,11 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		}
 
 		if medicineSheet.MedicineID != "" {
-			_, ok := medicineMapping[medicineSheet.MedicineID]
+			medicine, ok := medicineMapping[medicineSheet.MedicineID]
 			if ok {
+				if locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine) {
+					continue
+				}
 				err = s.medicineRepository.UpdateMedicine(ctx, model.UpdateMedicineRequest{
 					MedicineID:  medicineSheet.MedicineID,
 					LockerID:    locker,

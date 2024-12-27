@@ -53,6 +53,8 @@ func main() {
 	cloudStorage := google.NewStorage([]byte(cfg.Google.FirebaseCredential), cfg.Google.Storage.BucketName, cfg.Google.Storage.ExpiredTime)
 	defer cloudStorage.Shutdown()
 
+	sheet := google.NewSheet([]byte(cfg.Google.FirebaseCredential))
+
 	firebaseAuthen := google.NewFirebaseAuthen([]byte(cfg.Google.FirebaseCredential))
 
 	validate := validator.New()
@@ -83,7 +85,7 @@ func main() {
 	jwtService := service.NewJWTService(cfg.App.JWTKey, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
 	authenService := service.NewAuthenService(userRepository, cacheRepository, jwtService, firebaseAuthen)
 	userService := service.NewUserService(userRepository, firebaseAuthen, cloudStorage)
-	warehouseService := service.NewWarehouseService(warehouseRepository, lockerRepository, userRepository, medicineRepository, firebaseAuthen, cloudStorage)
+	warehouseService := service.NewWarehouseService(warehouseRepository, lockerRepository, userRepository, medicineRepository, firebaseAuthen, cloudStorage, sheet)
 	medicineService := service.NewMedicineService(medicineRepository, warehouseRepository, cloudStorage)
 
 	http.NewHealthzHandler(httpServer.Routers(), pgPool, redisClient)

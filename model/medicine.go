@@ -1,6 +1,10 @@
 package model
 
-import "mime/multipart"
+import (
+	"encoding/json"
+	"mime/multipart"
+	"strings"
+)
 
 type Medicine struct {
 	MedicineID  string  `json:"medicineID"`
@@ -61,12 +65,35 @@ type DeleteMedicineFilter struct {
 }
 
 type MedicineSheet struct {
-	MedicineID  string  `csv:"รหัส"`
-	LockerName  string  `csv:"ตู้"`
-	Floor       int32   `csv:"ชั้น"`
-	No          int32   `csv:"ลำดับที่"`
-	Address     string  `csv:"บ้านเลขที่ยา"`
-	Description string  `csv:"ชื่อสามัญทางยา"`
-	MedicalName *string `csv:"ชื่อการค้า"`
-	Label       *string `csv:"Label ตะกร้า"`
+	MedicineID  string  `csv:"รหัส" json:"medicineID"`
+	LockerName  string  `csv:"ตู้" json:"lockerName"`
+	Floor       int32   `csv:"ชั้น" json:"floor"`
+	No          int32   `csv:"ลำดับที่" json:"no"`
+	Address     string  `csv:"บ้านเลขที่ยา" json:"address"`
+	Description string  `csv:"ชื่อสามัญทางยา" json:"description"`
+	MedicalName *string `csv:"ชื่อการค้า" json:"medicalName"`
+	Label       *string `csv:"Label ตะกร้า" json:"label"`
+}
+
+func (m *MedicineSheet) IsDifferent(medicineReq Medicine) bool {
+	if m.MedicalName != nil && (strings.TrimSpace(*m.MedicalName) == "" || strings.TrimSpace(*m.MedicalName) == "-") {
+		m.MedicalName = nil
+	}
+	if m.Label != nil && (strings.TrimSpace(*m.Label) == "" || strings.TrimSpace(*m.Label) == "-") {
+		m.Label = nil
+	}
+
+	medicine := MedicineSheet{
+		MedicineID:  medicineReq.MedicineID,
+		LockerName:  m.LockerName,
+		Floor:       medicineReq.Floor,
+		No:          medicineReq.No,
+		Address:     medicineReq.Address,
+		Description: medicineReq.Description,
+		MedicalName: medicineReq.MedicalName,
+		Label:       medicineReq.Label,
+	}
+	d1, _ := json.Marshal(medicine)
+	d2, _ := json.Marshal(m)
+	return string(d1) != string(d2)
 }
