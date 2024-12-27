@@ -250,6 +250,13 @@ func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineR
 		CreatedAt:   time.Now(),
 	}
 
+	if medicine.MedicalName != nil && (strings.TrimSpace(*medicine.MedicalName) == "" || strings.TrimSpace(*medicine.MedicalName) == "-") {
+		medicine.MedicalName = nil
+	}
+	if medicine.Label != nil && (strings.TrimSpace(*medicine.Label) == "" || strings.TrimSpace(*medicine.Label) == "-") {
+		medicine.Label = nil
+	}
+
 	sql, args := medicines.INSERT(
 		medicines.MedicineID,
 		medicines.WarehouseID,
@@ -284,8 +291,6 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 		medicines.No,
 		medicines.Address,
 		medicines.Description,
-		medicines.MedicalName,
-		medicines.Label,
 		medicines.UpdatedAt,
 	}
 
@@ -295,8 +300,6 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 		postgres.Int32(req.No),
 		postgres.String(req.Address),
 		postgres.String(req.Description),
-		postgres.String(req.MedicalName),
-		postgres.String(req.Label),
 		postgres.TimestampzT(time.Now()),
 	}
 
@@ -306,6 +309,22 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 	} else if req.ImageURL != nil {
 		columnNames = append(columnNames, medicines.ImageURL)
 		columnValues = append(columnValues, postgres.String(*req.ImageURL))
+	}
+
+	if req.MedicalName != nil && (strings.TrimSpace(*req.MedicalName) == "" || strings.TrimSpace(*req.MedicalName) == "-") {
+		columnNames = append(columnNames, medicines.MedicalName)
+		columnValues = append(columnValues, postgres.NULL)
+	} else if req.MedicalName != nil {
+		columnNames = append(columnNames, medicines.MedicalName)
+		columnValues = append(columnValues, postgres.String(*req.MedicalName))
+	}
+
+	if req.Label != nil && (strings.TrimSpace(*req.Label) == "" || strings.TrimSpace(*req.Label) == "-") {
+		columnNames = append(columnNames, medicines.Label)
+		columnValues = append(columnValues, postgres.NULL)
+	} else if req.Label != nil {
+		columnNames = append(columnNames, medicines.Label)
+		columnValues = append(columnValues, postgres.String(*req.Label))
 	}
 
 	sql, args := medicines.

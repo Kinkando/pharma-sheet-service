@@ -28,28 +28,28 @@ type ListMedicine struct {
 }
 
 type CreateMedicineRequest struct {
-	WarehouseID string `form:"warehouseID" validate:"required"`
-	LockerID    string `form:"lockerID" validate:"required,uuid"`
-	Floor       int32  `form:"floor" validate:"omitempty,min=0"`
-	No          int32  `form:"no" validate:"omitempty,min=0"`
-	Address     string `form:"address" validate:"required"`
-	Description string `form:"description" validate:"required"`
-	MedicalName string `form:"medicalName" validate:"required"`
-	Label       string `form:"label" validate:"required"`
+	WarehouseID string  `form:"warehouseID" validate:"required"`
+	LockerID    string  `form:"lockerID" validate:"required,uuid"`
+	Floor       int32   `form:"floor" validate:"omitempty,min=0"`
+	No          int32   `form:"no" validate:"omitempty,min=0"`
+	Address     string  `form:"address" validate:"required"`
+	Description string  `form:"description" validate:"required"`
+	MedicalName *string `form:"medicalName"`
+	Label       *string `form:"label"`
 	File        *multipart.FileHeader
 	ImageURL    *string
 }
 
 type UpdateMedicineRequest struct {
-	MedicineID  string `param:"medicineID" validate:"required"`
-	LockerID    string `form:"lockerID" validate:"required,uuid"`
-	Floor       int32  `form:"floor" validate:"omitempty,min=0"`
-	No          int32  `form:"no" validate:"omitempty,min=0"`
-	Address     string `form:"address" validate:"required"`
-	Description string `form:"description" validate:"required"`
-	MedicalName string `form:"medicalName" validate:"required"`
-	Label       string `form:"label" validate:"required"`
-	DeleteImage bool   `form:"deleteImage"`
+	MedicineID  string  `param:"medicineID" validate:"required"`
+	LockerID    string  `form:"lockerID" validate:"required,uuid"`
+	Floor       int32   `form:"floor" validate:"omitempty,min=0"`
+	No          int32   `form:"no" validate:"omitempty,min=0"`
+	Address     string  `form:"address" validate:"required"`
+	Description string  `form:"description" validate:"required"`
+	MedicalName *string `form:"medicalName" validate:"required"`
+	Label       *string `form:"label" validate:"required"`
+	DeleteImage bool    `form:"deleteImage"`
 	File        *multipart.FileHeader
 	ImageURL    *string
 }
