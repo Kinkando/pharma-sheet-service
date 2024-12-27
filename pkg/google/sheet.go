@@ -23,10 +23,12 @@ import (
 )
 
 const (
-	delimiter         = ","
-	newLine           = "\n"
-	delimiterReplacer = "${DELIMITER}"
-	newLineReplacer   = "${NEW_LINE}"
+	delimiter           = ","
+	newLine             = "\n"
+	doubleQuote         = "\""
+	delimiterReplacer   = "${DELIMITER}"
+	newLineReplacer     = "${NEW_LINE}"
+	doubleQuoteReplacer = "${DOUBLE_QUOTE}"
 )
 
 //go:generate mockgen -source=google_sheet.go -destination=google_sheet_mock.go -package=googlesheet
@@ -221,7 +223,9 @@ func (g *googleSheet) RenameSheet(ctx context.Context, spreadsheetID string, she
 
 // unmarshal google sheet to struct
 func (g *googleSheet) Read(ctx context.Context, sheet *sheets.Sheet, data any, opts ...options.GoogleSheetReadOption) ([]byte, error) {
-	opt := &options.GoogleSheetRead{}
+	opt := &options.GoogleSheetRead{
+		ExcludeEmptyRow: true,
+	}
 	for _, o := range opts {
 		o.Apply(opt)
 	}
@@ -259,8 +263,15 @@ func (g *googleSheet) Read(ctx context.Context, sheet *sheets.Sheet, data any, o
 		// replace new line (\n) to another character to prevent an one row data with multiple lines
 		// and replace delimiter to another character to prevent csv custom unmarshal with dynamic delimiter that impact to lotus
 		rawTexts := make([]string, len(texts[i]))
+		isEmpty := true
 		for idx, text := range texts[i] {
+			if text != "" {
+				isEmpty = false
+			}
 			rawTexts[idx] = encodeDelimiterAndNewLine(text)
+		}
+		if isEmpty && opt.ExcludeEmptyRow {
+			continue
 		}
 		rawData += strings.Join(rawTexts, delimiter) + newLine
 	}
@@ -648,9 +659,9 @@ func getLastCell(data [][]options.GoogleSheetUpdateData, currentRow int) string 
 }
 
 func encodeDelimiterAndNewLine(text string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(text, delimiter, delimiterReplacer), newLine, newLineReplacer)
+	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(text, delimiter, delimiterReplacer), newLine, newLineReplacer), doubleQuote, doubleQuoteReplacer)
 }
 
 func decodeDelimiterAndNewLine(text string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(text, delimiterReplacer, delimiter), newLineReplacer, newLine)
+	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(text, delimiterReplacer, delimiter), newLineReplacer, newLine), doubleQuoteReplacer, doubleQuote)
 }

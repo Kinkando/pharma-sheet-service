@@ -16,6 +16,13 @@ func WithGoogleSheetReadColumnCount(columnCount int) GoogleSheetReadOption {
 	})
 }
 
+func WithGoogleSheetReadExcludeEmptyRow(isSkipEmptyRow bool) GoogleSheetReadOption {
+	return googleSheetReadOptionFunc(func(o *GoogleSheetRead) {
+		o.ExcludeEmptyRow = isSkipEmptyRow
+	})
+}
+
 type GoogleSheetRead struct {
-	ColumnCount int
+	ColumnCount     int
+	ExcludeEmptyRow bool
 }
