@@ -20,6 +20,7 @@ import (
 )
 
 type Warehouse interface {
+	GetWarehouse(ctx context.Context, warehouseID string) (model.Warehouse, error)
 	GetWarehouses(ctx context.Context) ([]model.Warehouse, error)
 	GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (model.PagingWithMetadata[model.WarehouseDetail], error)
 	CreateWarehouse(ctx context.Context, req model.CreateWarehouseRequest) (string, error)
@@ -64,6 +65,29 @@ func NewWarehouseService(
 		firebaseAuthen:      firebaseAuthen,
 		storage:             storage,
 	}
+}
+
+func (s *warehouse) GetWarehouse(ctx context.Context, warehouseID string) (model.Warehouse, error) {
+	warehouse, err := s.warehouseRepository.GetWarehouse(ctx, warehouseID)
+	if err != nil {
+		return model.Warehouse{}, err
+	}
+
+	lockers, err := s.lockerRepository.GetLockers(ctx, warehouse.WarehouseID)
+	if err != nil {
+		return model.Warehouse{}, err
+	}
+
+	warehouseLockers := make([]model.Locker, 0, len(lockers))
+	for _, locker := range lockers {
+		warehouseLockers = append(warehouseLockers, model.Locker{
+			LockerID:   locker.LockerID.String(),
+			LockerName: locker.Name,
+		})
+	}
+	warehouse.Lockers = warehouseLockers
+
+	return warehouse, nil
 }
 
 func (s *warehouse) GetWarehouses(ctx context.Context) ([]model.Warehouse, error) {

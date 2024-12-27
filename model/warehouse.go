@@ -1,12 +1,18 @@
 package model
 
-import "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+import (
+	"time"
+
+	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+)
 
 type Warehouse struct {
-	WarehouseID string   `json:"warehouseID"`
-	Name        string   `json:"warehouseName"`
-	Role        string   `json:"role"`
-	Lockers     []Locker `json:"lockers"`
+	WarehouseID    string     `json:"warehouseID"`
+	Name           string     `json:"warehouseName"`
+	Role           string     `json:"role"`
+	Lockers        []Locker   `json:"lockers"`
+	SheetURL       *string    `json:"sheetURL,omitempty"`
+	LatestSyncedAt *time.Time `json:"latestSyncedAt,omitempty"`
 }
 
 type Locker struct {
@@ -43,6 +49,10 @@ type CreateWarehouseRequest struct {
 type UpdateWarehouseRequest struct {
 	WarehouseID   string `param:"warehouseID" validate:"required,uuid"`
 	WarehouseName string `json:"warehouseName" validate:"required"`
+}
+
+type GetWarehouseRequest struct {
+	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 }
 
 type DeleteWarehouseRequest struct {

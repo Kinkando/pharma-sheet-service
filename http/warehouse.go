@@ -1,6 +1,8 @@
 package http
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
@@ -23,8 +25,9 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 	}
 
 	route := e.Group("/warehouse")
-	route.GET("", handler.getWarehouse)
+	route.GET("", handler.getWarehouses)
 	route.GET("/detail", handler.getWarehouseDetails)
+	route.GET("/:warehouseID", handler.getWarehouse)
 	route.POST("", handler.createWarehouse)
 	route.PATCH("/:warehouseID", handler.updateWarehouse)
 	route.DELETE("/:warehouseID", handler.deleteWarehouse)
@@ -42,7 +45,7 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 	warehouseUserRoute.DELETE("/:userID", handler.deleteWarehouseUser)
 }
 
-func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
+func (h *WarehouseHandler) getWarehouses(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	warehouses, err := h.warehouseService.GetWarehouses(ctx)
@@ -53,6 +56,32 @@ func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
 
 	if warehouses == nil {
 		warehouses = []model.Warehouse{}
+	}
+
+	return c.JSON(http.StatusOK, warehouses)
+}
+
+func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.GetWarehouseRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	warehouses, err := h.warehouseService.GetWarehouse(ctx, req.WarehouseID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "warehouse id not found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
 	return c.JSON(http.StatusOK, warehouses)

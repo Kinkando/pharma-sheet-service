@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 )
 
 type Warehouse interface {
+	GetWarehouse(ctx context.Context, warehouseID string) (model.Warehouse, error)
 	GetWarehouses(ctx context.Context) ([]model.Warehouse, error)
 	GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (data []model.WarehouseDetail, total uint64, err error)
 	GetWarehouseRole(ctx context.Context, warehouseID, userID string) (genmodel.Role, error)
@@ -46,6 +48,48 @@ func NewWarehouseRepository(pgPool *pgxpool.Pool) Warehouse {
 	return &warehouse{pgPool: pgPool}
 }
 
+func (r *warehouse) GetWarehouse(ctx context.Context, warehouseID string) (model.Warehouse, error) {
+	query, args := table.Warehouses.
+		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
+		LEFT_JOIN(table.WarehouseSheets, table.Warehouses.WarehouseID.EQ(table.WarehouseSheets.WarehouseID)).
+		SELECT(
+			table.Warehouses.WarehouseID,
+			table.Warehouses.Name,
+			table.WarehouseUsers.Role,
+			table.WarehouseSheets.SpreadsheetID,
+			table.WarehouseSheets.SheetID,
+			table.WarehouseSheets.LatestSyncedAt,
+		).
+		WHERE(table.Warehouses.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
+		Sql()
+
+	var warehouse model.Warehouse
+	var spreadsheetID *string
+	var sheetID *int32
+
+	err := r.pgPool.
+		QueryRow(ctx, query, args...).
+		Scan(
+			&warehouse.WarehouseID,
+			&warehouse.Name,
+			&warehouse.Role,
+			&spreadsheetID,
+			&sheetID,
+			&warehouse.LatestSyncedAt,
+		)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return model.Warehouse{}, err
+	}
+
+	if sheetID != nil && spreadsheetID != nil {
+		sheetURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit#gid=%d", *spreadsheetID, *sheetID)
+		warehouse.SheetURL = &sheetURL
+	}
+
+	return warehouse, nil
+}
+
 func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Warehouse, err error) {
 	userProfile, err := profile.UseProfile(ctx)
 	if err != nil {
@@ -54,7 +98,15 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 
 	query, args := table.Warehouses.
 		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
-		SELECT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.WarehouseUsers.Role).
+		LEFT_JOIN(table.WarehouseSheets, table.Warehouses.WarehouseID.EQ(table.WarehouseSheets.WarehouseID)).
+		SELECT(
+			table.Warehouses.WarehouseID,
+			table.Warehouses.Name,
+			table.WarehouseUsers.Role,
+			table.WarehouseSheets.SpreadsheetID,
+			table.WarehouseSheets.SheetID,
+			table.WarehouseSheets.LatestSyncedAt,
+		).
 		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))).
 		ORDER_BY(table.Warehouses.Name.ASC()).
 		Sql()
@@ -68,10 +120,25 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 
 	for rows.Next() {
 		var warehouse model.Warehouse
-		err = rows.Scan(&warehouse.WarehouseID, &warehouse.Name, &warehouse.Role)
+		var spreadsheetID *string
+		var sheetID *int32
+
+		err = rows.Scan(
+			&warehouse.WarehouseID,
+			&warehouse.Name,
+			&warehouse.Role,
+			&spreadsheetID,
+			&sheetID,
+			&warehouse.LatestSyncedAt,
+		)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return nil, err
+		}
+
+		if sheetID != nil && spreadsheetID != nil {
+			sheetURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit#gid=%d", *spreadsheetID, *sheetID)
+			warehouse.SheetURL = &sheetURL
 		}
 		warehouses = append(warehouses, warehouse)
 	}
