@@ -34,6 +34,8 @@ type Warehouse interface {
 	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error
 	UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error
 	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
+
+	UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.WarehouseSheets) error
 }
 
 type warehouse struct {
@@ -414,6 +416,29 @@ func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID string,
 
 	if result.RowsAffected() == 0 {
 		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *warehouse) UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.WarehouseSheets) error {
+	warehouseSheet.LatestSyncedAt = time.Now()
+	warehouseSheet.CreatedAt = time.Now()
+
+	stmt, args := table.WarehouseSheets.
+		INSERT(table.WarehouseSheets.WarehouseID, table.WarehouseSheets.SpreadsheetID, table.WarehouseSheets.SheetID, table.WarehouseSheets.LatestSyncedAt, table.WarehouseSheets.CreatedAt).
+		MODEL(warehouseSheet).
+		ON_CONFLICT(table.WarehouseSheets.WarehouseID).
+		DO_UPDATE(postgres.SET(
+			table.WarehouseSheets.SpreadsheetID.SET(postgres.String(warehouseSheet.SpreadsheetID)),
+			table.WarehouseSheets.SheetID.SET(postgres.Int32(warehouseSheet.SheetID)),
+			table.WarehouseSheets.LatestSyncedAt.SET(postgres.TimestampzT(time.Now())),
+		)).
+		Sql()
+	_, err := r.pgPool.Exec(ctx, stmt, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
 	}
 
 	return nil
