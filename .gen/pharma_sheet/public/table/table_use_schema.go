@@ -14,6 +14,7 @@ func UseSchema(schema string) {
 	Medicines = Medicines.FromSchema(schema)
 	SchemaMigrations = SchemaMigrations.FromSchema(schema)
 	Users = Users.FromSchema(schema)
+	WarehouseSheets = WarehouseSheets.FromSchema(schema)
 	WarehouseUsers = WarehouseUsers.FromSchema(schema)
 	Warehouses = Warehouses.FromSchema(schema)
 }

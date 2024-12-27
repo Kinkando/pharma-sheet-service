@@ -66,7 +66,17 @@ CREATE TABLE medicines (
   CONSTRAINT fk_medicine_locker_id FOREIGN KEY (locker_id) REFERENCES lockers (locker_id)
 );
 
+CREATE TABLE warehouse_sheets (
+  warehouse_id UUID NOT NULL UNIQUE,
+  spreadsheet_id TEXT NOT NULL,
+  sheet_id INT NOT NULL,
+  latest_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id)
+)
+
 -- migrate:down
+DROP TABLE IF EXISTS warehouse_sheets;
 DROP TABLE IF EXISTS medicines;
 DROP TABLE IF EXISTS lockers;
 DROP TABLE IF EXISTS warehouse_users;
