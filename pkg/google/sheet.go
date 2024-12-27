@@ -1,13 +1,16 @@
 package google
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"time"
 
+	"github.com/gocarina/gocsv"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	options "github.com/kinkando/pharma-sheet-service/pkg/option"
 	"github.com/xuri/excelize/v2"
@@ -19,6 +22,13 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+const (
+	delimiter         = ","
+	newLine           = "\n"
+	delimiterReplacer = "${DELIMITER}"
+	newLineReplacer   = "${NEW_LINE}"
+)
+
 //go:generate mockgen -source=google_sheet.go -destination=google_sheet_mock.go -package=googlesheet
 type Sheet interface {
 	Create(ctx context.Context, title string, opts ...options.GoogleSheetCreateOption) (*sheets.Spreadsheet, error)
@@ -26,6 +36,8 @@ type Sheet interface {
 	Get(ctx context.Context, spreadsheetID string) (*sheets.Spreadsheet, error)
 	Update(ctx context.Context, spreadsheetID string, opts ...options.GoogleSheetUpdateOption) error
 	RenameSheet(ctx context.Context, spreadsheetID string, sheetId int64, title string) error
+	Read(ctx context.Context, sheet *sheets.Sheet, data any, opts ...options.GoogleSheetReadOption) ([]byte, error)
+	Write(ctx context.Context, data any, opts ...options.GoogleSheetWriteOption) ([][]options.GoogleSheetUpdateData, error)
 }
 
 type googleSheet struct {
@@ -205,6 +217,148 @@ func (g *googleSheet) RenameSheet(ctx context.Context, spreadsheetID string, she
 		return fmt.Errorf("google: sheet: RenameSheet: unable to rename sheet: %v", err)
 	}
 	return nil
+}
+
+// unmarshal google sheet to struct
+func (g *googleSheet) Read(ctx context.Context, sheet *sheets.Sheet, data any, opts ...options.GoogleSheetReadOption) ([]byte, error) {
+	opt := &options.GoogleSheetRead{}
+	for _, o := range opts {
+		o.Apply(opt)
+	}
+
+	if len(sheet.Data) == 0 || len(sheet.Data[0].RowData) <= 1 {
+		return nil, nil
+	}
+
+	if opt.ColumnCount == 0 {
+		opt.ColumnCount = len(sheet.Data[0].RowData[0].Values)
+	}
+
+	var columnNames []string
+	for _, cell := range sheet.Data[0].RowData[0].Values[0:opt.ColumnCount] {
+		columnNames = append(columnNames, cell.FormattedValue)
+	}
+
+	// read data from google sheet to csv format
+	texts := [][]string{columnNames}
+	for _, rowData := range sheet.Data[0].RowData[1:] {
+		var values []string
+		lastColumn := int(math.Min(float64(opt.ColumnCount), float64(len(rowData.Values))))
+		for _, value := range rowData.Values[0:lastColumn] {
+			values = append(values, value.FormattedValue)
+		}
+		for i := len(values); i < opt.ColumnCount; i++ {
+			values = append(values, "")
+		}
+		texts = append(texts, values)
+	}
+
+	// unmarshal csv format to struct
+	rawData := ""
+	for i := range texts {
+		// replace new line (\n) to another character to prevent an one row data with multiple lines
+		// and replace delimiter to another character to prevent csv custom unmarshal with dynamic delimiter that impact to lotus
+		rawTexts := make([]string, len(texts[i]))
+		for idx, text := range texts[i] {
+			rawTexts[idx] = encodeDelimiterAndNewLine(text)
+		}
+		rawData += strings.Join(rawTexts, delimiter) + newLine
+	}
+	rawData = strings.TrimSuffix(rawData, newLine)
+
+	err := gocsv.Unmarshal(bytes.NewReader([]byte(rawData)), data)
+	if err != nil {
+		return nil, err
+	}
+
+	v := reflect.ValueOf(data)
+	if v.Kind() != reflect.Ptr && v.Elem().Kind() != reflect.Slice {
+		return nil, fmt.Errorf("google: sheet: Read: data must be a slice of struct")
+	}
+
+	// replace another character to new line (\n) and delimiter
+	slice := v.Elem()
+	for i := 0; i < slice.Len(); i++ {
+		row := slice.Index(i)
+		if row.Kind() != reflect.Struct {
+			return nil, fmt.Errorf("google: sheet: Read: data must be a struct")
+		}
+		for j := 0; j < row.NumField(); j++ {
+			field := row.Field(j)
+			if field.Kind() == reflect.Ptr {
+				field = field.Elem()
+			}
+			if field.Kind() == reflect.String {
+				field.SetString(decodeDelimiterAndNewLine(field.String()))
+			}
+		}
+	}
+
+	return json.Marshal(data)
+}
+
+// convert slice of struct to google sheet update data
+func (g *googleSheet) Write(ctx context.Context, data any, opts ...options.GoogleSheetWriteOption) (output [][]options.GoogleSheetUpdateData, err error) {
+	opt := &options.GoogleSheetWrite{}
+	for _, o := range opts {
+		o.Apply(opt)
+	}
+
+	v := reflect.ValueOf(data)
+	t := reflect.TypeOf(data)
+	if v.Kind() != reflect.Slice || (v.Kind() == reflect.Ptr && v.Elem().Kind() != reflect.Slice) {
+		return nil, fmt.Errorf("google: sheet: Write: data must be a slice of struct")
+	}
+
+	slice := v
+	if v.Kind() == reflect.Ptr {
+		slice = v.Elem()
+		t = t.Elem()
+	}
+
+	if t.Kind() == reflect.Slice {
+		t = t.Elem()
+	}
+
+	isOrderedByColumn := len(opt.ColumnNames) > 0
+	for i := 0; i < slice.Len(); i++ {
+		row := slice.Index(i)
+		reflectType := t
+		if row.Kind() == reflect.Ptr {
+			row = row.Elem()
+			reflectType = t.Elem()
+		}
+		if row.Kind() != reflect.Struct {
+			return nil, fmt.Errorf("google: sheet: Write: data must be a struct")
+		}
+
+		var cells []options.GoogleSheetUpdateData
+		value := make(map[string]any)
+		for j := 0; j < reflectType.NumField(); j++ {
+			field := row.Field(j)
+			rawValue := field.Interface()
+			if !field.IsValid() {
+				rawValue = ""
+			}
+
+			if !isOrderedByColumn {
+				cells = append(cells, options.GoogleSheetUpdateData{Value: rawValue})
+				continue
+			}
+
+			value[reflectType.Field(j).Tag.Get("csv")] = rawValue
+		}
+
+		if isOrderedByColumn {
+			for _, col := range opt.ColumnNames {
+				cells = append(cells, options.GoogleSheetUpdateData{Value: value[col]})
+			}
+		}
+
+		output = append(output, cells)
+	}
+
+	return output, nil
 }
 
 // colIndex starts from 0
@@ -491,4 +645,12 @@ func getLastCell(data [][]options.GoogleSheetUpdateData, currentRow int) string 
 		}
 	}
 	return fmt.Sprintf("%s%d", ColumnNumberToLetter(max), len(data)+currentRow)
+}
+
+func encodeDelimiterAndNewLine(text string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(text, delimiter, delimiterReplacer), newLine, newLineReplacer)
+}
+
+func decodeDelimiterAndNewLine(text string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(text, delimiterReplacer, delimiter), newLineReplacer, newLine)
 }

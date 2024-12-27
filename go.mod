@@ -8,6 +8,7 @@ require (
 	github.com/caarlos0/env/v11 v11.2.2
 	github.com/go-jet/jet/v2 v2.12.0
 	github.com/go-playground/validator/v10 v10.23.0
+	github.com/gocarina/gocsv v0.0.0-20240520201108-78e41c74b4b1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/joho/godotenv v1.5.1
