@@ -4,8 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
+	"strconv"
+	"time"
 
 	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
@@ -13,10 +17,14 @@ import (
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/option"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/labstack/echo/v4"
 	"github.com/sourcegraph/conc/pool"
+	"github.com/xuri/excelize/v2"
+	"go.uber.org/ratelimit"
+	"google.golang.org/api/sheets/v4"
 )
 
 type Warehouse interface {
@@ -38,6 +46,8 @@ type Warehouse interface {
 	JoinWarehouse(ctx context.Context, warehouseID, userID string) error
 	ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 	RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
+
+	SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error
 }
 
 type warehouse struct {
@@ -47,6 +57,7 @@ type warehouse struct {
 	medicineRepository  repository.Medicine
 	firebaseAuthen      *auth.Client
 	storage             google.Storage
+	sheet               google.Sheet
 }
 
 func NewWarehouseService(
@@ -56,6 +67,7 @@ func NewWarehouseService(
 	medicineRepository repository.Medicine,
 	firebaseAuthen *auth.Client,
 	storage google.Storage,
+	sheet google.Sheet,
 ) Warehouse {
 	return &warehouse{
 		warehouseRepository: warehouseRepository,
@@ -64,6 +76,7 @@ func NewWarehouseService(
 		medicineRepository:  medicineRepository,
 		firebaseAuthen:      firebaseAuthen,
 		storage:             storage,
+		sheet:               sheet,
 	}
 }
 
@@ -541,4 +554,202 @@ func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseU
 	}
 
 	return nil
+}
+
+func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error {
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	spreadsheetID, sheetID, err := extractSpreadsheetInfo(req.URL)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
+	}
+
+	spreadsheet, err := s.sheet.Get(ctx, spreadsheetID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
+	}
+
+	var sheet *sheets.Sheet
+	for _, spreadSheet := range spreadsheet.Sheets {
+		if spreadSheet.Properties.SheetId == int64(sheetID) {
+			sheet = spreadSheet
+			break
+		}
+	}
+	if sheet == nil {
+		logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "sheetID is not found"})
+	}
+
+	var medicineSheets []model.MedicineSheet
+	_, err = s.sheet.Read(ctx, sheet, &medicineSheets)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	columns, err := s.sheet.ReadColumns(ctx, sheet)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	columnIDIndex := slices.Index(columns, "รหัส")
+	isFoundColumnID := columnIDIndex != -1
+	if !isFoundColumnID {
+		columnIDIndex = len(columns)
+		err = s.sheet.Update(
+			ctx,
+			spreadsheetID,
+			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
+			option.WithGoogleSheetUpdateColumns([]option.GoogleSheetUpdateColumn{{Value: "รหัส", Width: 500}}),
+			option.WithGoogleSheetUpdateColumnStartIndex(int64(columnIDIndex)+1),
+			option.WithGoogleSheetUpdateIsTextWraping(true),
+			option.WithGoogleSheetUpdateFontSize(20),
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+	}
+
+	lockers, err := s.lockerRepository.GetLockers(ctx, req.WarehouseID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	lockerID := make(map[string]string)
+	for _, locker := range lockers {
+		lockerID[locker.Name] = locker.LockerID.String()
+	}
+
+	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: req.WarehouseID})
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	medicineMapping := make(map[string]model.Medicine)
+	for _, medicine := range medicines {
+		medicineMapping[medicine.MedicineID] = medicine
+	}
+
+	rateLimit := ratelimit.New(30, ratelimit.Per(time.Minute))
+	for index, medicineSheet := range medicineSheets {
+		locker, ok := lockerID[medicineSheet.LockerName]
+		if !ok {
+			lockerID[medicineSheet.LockerName], err = s.lockerRepository.CreateLocker(ctx, genmodel.Lockers{
+				WarehouseID: uuid.MustParse(req.WarehouseID),
+				Name:        medicineSheet.LockerName,
+			})
+			if err != nil {
+				logger.Context(ctx).Error(err)
+				return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+			}
+			locker = lockerID[medicineSheet.LockerName]
+		}
+
+		if medicineSheet.MedicineID != "" {
+			_, ok := medicineMapping[medicineSheet.MedicineID]
+			if ok {
+				err = s.medicineRepository.UpdateMedicine(ctx, model.UpdateMedicineRequest{
+					MedicineID:  medicineSheet.MedicineID,
+					LockerID:    locker,
+					Floor:       medicineSheet.Floor,
+					No:          medicineSheet.No,
+					Address:     medicineSheet.Address,
+					Description: medicineSheet.Description,
+					MedicalName: medicineSheet.MedicalName,
+					Label:       medicineSheet.Label,
+				})
+				if err != nil {
+					logger.Context(ctx).Error(err)
+					// return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+				}
+				continue
+			}
+		}
+
+		req := model.CreateMedicineRequest{
+			WarehouseID: req.WarehouseID,
+			LockerID:    locker,
+			Floor:       medicineSheet.Floor,
+			No:          medicineSheet.No,
+			Address:     medicineSheet.Address,
+			Description: medicineSheet.Description,
+			MedicalName: medicineSheet.MedicalName,
+			Label:       medicineSheet.Label,
+		}
+
+		medicineID, err := s.medicineRepository.CreateMedicine(ctx, req)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			continue
+		}
+
+		col, _ := excelize.ColumnNumberToName(columnIDIndex + 1)
+
+		rateLimit.Take()
+		err = s.sheet.Update(
+			ctx,
+			spreadsheetID,
+			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
+			option.WithGoogleSheetUpdateData([][]option.GoogleSheetUpdateData{{{Value: medicineID}}}),
+			option.WithGoogleSheetUpdateIsTextWraping(true),
+			option.WithGoogleSheetUpdateFontSize(20),
+			option.WithGoogleSheetUpdateStartCellRange(fmt.Sprintf("%s%d", col, index+2)),
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+	}
+
+	warehouseSheet := genmodel.WarehouseSheets{
+		WarehouseID:   uuid.MustParse(req.WarehouseID),
+		SpreadsheetID: spreadsheetID,
+		SheetID:       sheetID,
+	}
+	return s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
+}
+
+func extractSpreadsheetInfo(url string) (string, int32, error) {
+	// Regular expressions for extracting the spreadsheet ID and gid
+	spreadsheetIDPattern := `\/d\/([a-zA-Z0-9-_]+)`
+	gidPattern := `gid=(\d+)`
+
+	// Compile the regex patterns
+	spreadsheetIDRegex, err := regexp.Compile(spreadsheetIDPattern)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to compile spreadsheet ID regex: %v", err)
+	}
+
+	gidRegex, err := regexp.Compile(gidPattern)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to compile gid regex: %v", err)
+	}
+
+	// Find the spreadsheet ID and gid using the regex
+	spreadsheetIDMatches := spreadsheetIDRegex.FindStringSubmatch(url)
+	if len(spreadsheetIDMatches) < 2 {
+		return "", 0, fmt.Errorf("failed to extract spreadsheet ID from the URL")
+	}
+
+	gidMatches := gidRegex.FindStringSubmatch(url)
+	if len(gidMatches) < 2 {
+		return "", 0, fmt.Errorf("failed to extract gid from the URL")
+	}
+
+	gid, err := strconv.Atoi(gidMatches[1])
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to convert gid to integer: %v", err)
+	}
+
+	// Return the extracted values
+	return spreadsheetIDMatches[1], int32(gid), nil
 }

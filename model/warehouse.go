@@ -119,3 +119,8 @@ type DeleteLockerFilter struct {
 	LockerID    string
 	WarehouseID string
 }
+
+type SyncMedicineRequest struct {
+	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	URL         string `json:"url" validate:"required,url"`
+}

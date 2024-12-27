@@ -63,7 +63,8 @@ CREATE TABLE medicines (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
   CONSTRAINT fk_medicine_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES warehouses (warehouse_id),
-  CONSTRAINT fk_medicine_locker_id FOREIGN KEY (locker_id) REFERENCES lockers (locker_id)
+  CONSTRAINT fk_medicine_locker_id FOREIGN KEY (locker_id) REFERENCES lockers (locker_id),
+  CONSTRAINT medicine_unique UNIQUE (warehouse_id, locker_id, floor, no)
 );
 
 CREATE TABLE warehouse_sheets (

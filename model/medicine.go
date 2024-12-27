@@ -11,8 +11,8 @@ type Medicine struct {
 	No          int32   `json:"no"`
 	Address     string  `json:"address"`
 	Description string  `json:"description"`
-	MedicalName string  `json:"medicalName"`
-	Label       string  `json:"label"`
+	MedicalName *string `json:"medicalName,omitempty"`
+	Label       *string `json:"label,omitempty"`
 	ImageURL    *string `json:"imageURL,omitempty"`
 }
 
@@ -58,4 +58,15 @@ type DeleteMedicineFilter struct {
 	MedicineID  string
 	LockerID    string
 	WarehouseID string
+}
+
+type MedicineSheet struct {
+	MedicineID  string  `csv:"รหัส"`
+	LockerName  string  `csv:"ตู้"`
+	Floor       int32   `csv:"ชั้น"`
+	No          int32   `csv:"ลำดับที่"`
+	Address     string  `csv:"บ้านเลขที่ยา"`
+	Description string  `csv:"ชื่อสามัญทางยา"`
+	MedicalName *string `csv:"ชื่อการค้า"`
+	Label       *string `csv:"Label ตะกร้า"`
 }
