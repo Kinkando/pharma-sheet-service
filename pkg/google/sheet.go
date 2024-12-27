@@ -187,13 +187,6 @@ func (g *googleSheet) Update(ctx context.Context, spreadsheetID string, opts ...
 		}
 	}
 
-	if opt.ApplyFilter {
-		err = g.applyFilter(ctx, spreadsheetID, opt.SheetID, int64(len(opt.Columns)))
-		if err != nil {
-			return fmt.Errorf("google: sheet: Update: %v", err)
-		}
-	}
-
 	if len(opt.Data) > 0 {
 		err = g.setData(ctx, spreadsheetID, opt)
 		if err != nil {
@@ -482,7 +475,7 @@ func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *
 		return fmt.Errorf("unable to set sheet header: %v", err)
 	}
 
-	err = g.setCellOption(ctx, spreadsheetID, opt.SheetID, 0, 1, 0, int64(len(opt.Columns)), true, opt)
+	err = g.setCellOption(ctx, spreadsheetID, opt.SheetID, 0, 1, 0+opt.ColumnStartIndex-1, int64(len(opt.Columns))+opt.ColumnStartIndex-1, true, opt)
 	if err != nil {
 		return err
 	}
@@ -495,10 +488,17 @@ func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *
 		}
 
 		if width > 0 {
-			err = g.resizeColumnWidth(ctx, spreadsheetID, opt.SheetID, int64(index), width)
+			err = g.resizeColumnWidth(ctx, spreadsheetID, opt.SheetID, int64(index)+opt.ColumnStartIndex-1, width)
 			if err != nil {
 				return fmt.Errorf("google: sheet: Update: %v", err)
 			}
+		}
+	}
+
+	if opt.ApplyFilter {
+		err = g.applyFilter(ctx, spreadsheetID, opt.SheetID, opt.ColumnStartIndex-1, int64(len(opt.Columns)))
+		if err != nil {
+			return fmt.Errorf("google: sheet: Update: %v", err)
 		}
 	}
 
@@ -510,13 +510,17 @@ func (g *googleSheet) setData(ctx context.Context, spreadsheetID string, opt *op
 		opt.StartCellRange = "A2"
 	}
 	if opt.EndCellRange == "A1" {
-		opt.EndCellRange = getLastCell(opt.Data, 0)
+		col, row, err := excelize.CellNameToCoordinates(opt.StartCellRange)
+		if err != nil {
+			return err
+		}
+		opt.EndCellRange = getLastCell(opt.Data, row-1, col-1)
 	}
 
 	cellRange := opt.StartCellRange + ":" + opt.EndCellRange
 	if len(opt.Columns) > 0 {
 		if len(opt.Data) > 0 {
-			cellRange = "A2:" + getLastCell(opt.Data, 1)
+			cellRange = "A2:" + getLastCell(opt.Data, 1, 0)
 		} else {
 			cellRange = "A2:" + fmt.Sprintf("%s%d", ColumnNumberToLetter(len(opt.Columns)), len(opt.Data)+1)
 		}
@@ -530,9 +534,22 @@ func (g *googleSheet) setData(ctx context.Context, spreadsheetID string, opt *op
 
 		row := 1
 		if len(sheet.Data) > 0 {
-			row = len(sheet.Data[0].RowData) + 1
+			lastValidRow := 1
+			for index, rowData := range sheet.Data[0].RowData {
+				isEmpty := true
+				for _, value := range rowData.Values {
+					if value.FormattedValue != "" {
+						isEmpty = false
+						break
+					}
+				}
+				if !isEmpty {
+					lastValidRow = index + 1
+				}
+			}
+			row = lastValidRow + 1
 		}
-		cellRange = fmt.Sprintf("A%d:%s", row, getLastCell(opt.Data, row-1))
+		cellRange = fmt.Sprintf("A%d:%s", row, getLastCell(opt.Data, row-1, 0))
 	}
 
 	var data [][]any
@@ -585,10 +602,10 @@ func (g *googleSheet) setCellOption(ctx context.Context, spreadsheetID string, s
 			}
 			if isHeader {
 				format.TextFormat.Bold = true
-				if len(opt.Columns) == 0 || len(opt.Columns) != int(endColumnIndex) {
+				if len(opt.Columns) == 0 || len(opt.Columns) != int(endColumnIndex-startColumnIndex) {
 					return fmt.Errorf("unable to set cell option: column count is not match with end column index")
 				}
-				if cellFormat := opt.Columns[j].CellFormat; cellFormat != nil {
+				if cellFormat := opt.Columns[j-startColumnIndex].CellFormat; cellFormat != nil {
 					format = cellFormat
 					if fields != "userEnteredFormat" {
 						fields = "userEnteredFormat"
@@ -639,16 +656,16 @@ func (g *googleSheet) setCellOption(ctx context.Context, spreadsheetID string, s
 	return nil
 }
 
-func (g *googleSheet) applyFilter(ctx context.Context, spreadsheetID string, sheetID int64, columnLength int64) error {
+func (g *googleSheet) applyFilter(ctx context.Context, spreadsheetID string, sheetID int64, startColumnIndex, columnLength int64) error {
 	request := &sheets.Request{
 		SetBasicFilter: &sheets.SetBasicFilterRequest{
 			Filter: &sheets.BasicFilter{
 				Range: &sheets.GridRange{
-					SheetId:          sheetID,      // The sheet ID to which you want to apply the filter
-					StartRowIndex:    0,            // The row index to start the filter (0 for the first row)
-					EndRowIndex:      1,            // The row index to end the filter (1 for the first row)
-					StartColumnIndex: 0,            // The column index to start the filter
-					EndColumnIndex:   columnLength, // The column index to end the filter
+					SheetId:          sheetID,                         // The sheet ID to which you want to apply the filter
+					StartRowIndex:    0,                               // The row index to start the filter (0 for the first row)
+					EndRowIndex:      1,                               // The row index to end the filter (1 for the first row)
+					StartColumnIndex: startColumnIndex,                // The column index to start the filter
+					EndColumnIndex:   startColumnIndex + columnLength, // The column index to end the filter
 				},
 			},
 		},
@@ -693,7 +710,8 @@ func ColumnLetterToNumber(columnLetter string) int {
 	return columnNumber
 }
 
-func getLastCell(data [][]options.GoogleSheetUpdateData, currentRow int) string {
+// currentColumn is zero-based index
+func getLastCell(data [][]options.GoogleSheetUpdateData, currentRow, currentColumn int) string {
 	// Adjust for header row
 	if currentRow < 1 {
 		currentRow = 1
@@ -705,7 +723,7 @@ func getLastCell(data [][]options.GoogleSheetUpdateData, currentRow int) string 
 			max = len(row)
 		}
 	}
-	return fmt.Sprintf("%s%d", ColumnNumberToLetter(max), len(data)+currentRow)
+	return fmt.Sprintf("%s%d", ColumnNumberToLetter(max+currentColumn), len(data)+currentRow)
 }
 
 func encodeDelimiterAndNewLine(text string) string {
