@@ -15,6 +15,7 @@ import (
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/util"
 )
 
 type Medicine interface {
@@ -108,6 +109,14 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 		)
 	}
 
+	sortBy := "description ASC"
+	if sorts := strings.Split(*filter.Sort, " "); filter.Sort != nil && *filter.Sort != "" && len(sorts) == 2 {
+		sortBy = util.CamelToSnake(sorts[0]) + " " + sorts[1]
+	}
+	if !strings.HasSuffix(strings.ToUpper(sortBy), " ASC") && !strings.HasSuffix(strings.ToUpper(sortBy), " DESC") {
+		sortBy = strings.Split(*filter.Sort, " ")[0] + " ASC"
+	}
+
 	query, args := medicines.
 		SELECT(postgres.COUNT(medicines.MedicineID)).
 		WHERE(condition).
@@ -140,7 +149,7 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 		WHERE(condition).
 		LIMIT(int64(filter.Limit)).
 		OFFSET(int64(filter.Offset)).
-		ORDER_BY(medicines.Description.ASC()).
+		ORDER_BY(postgres.Raw(sortBy)).
 		Sql()
 
 	rows, err := r.pgPool.Query(ctx, query, args...)
