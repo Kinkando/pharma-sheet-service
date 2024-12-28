@@ -98,23 +98,65 @@ func WithGoogleSheetUpdateColumnStartIndex(columnStartIndex int64) GoogleSheetUp
 	})
 }
 
+func WithGoogleSheetUpdateIsLockedCell(isLockedCell bool) GoogleSheetUpdateOption {
+	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
+		o.IsLockedCell = isLockedCell
+	})
+}
+
+func WithGoogleSheetUpdateIsUnlockedCell(isUnlockedCell bool) GoogleSheetUpdateOption {
+	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
+		o.IsUnlockedCell = isUnlockedCell
+	})
+}
+
+func WithGoogleSheetUpdateIsLockedCellData(isLockedCellData bool) GoogleSheetUpdateOption {
+	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
+		o.IsLockedCellData = isLockedCellData
+	})
+}
+
+func WithGoogleSheetUpdateIsUnlockedCellData(isUnlockedCellData bool) GoogleSheetUpdateOption {
+	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
+		o.IsUnlockedCellData = isUnlockedCellData
+	})
+}
+
+func WithGoogleSheetUpdateIsLockedCellColumn(isLockedCellColumn bool) GoogleSheetUpdateOption {
+	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
+		o.IsLockedCellColumn = isLockedCellColumn
+	})
+}
+
+func WithGoogleSheetUpdateIsUnlockedCellColumn(isUnlockedCellColumn bool) GoogleSheetUpdateOption {
+	return googleSheetUpdateOptionFunc(func(o *GoogleSheetUpdate) {
+		o.IsUnlockedCellColumn = isUnlockedCellColumn
+	})
+}
+
 type GoogleSheetUpdate struct {
 	SheetID          int64
 	SheetTitle       string
 	StartCellRange   string
 	EndCellRange     string
 	FontSize         int64
+	IsLockedCell     bool
+	IsUnlockedCell   bool
 	ValueInputOption ValueInputOption
 
-	Data         [][]GoogleSheetUpdateData
-	IsAppendData bool
+	Data               [][]GoogleSheetUpdateData
+	IsAppendData       bool
+	IsLockedCellData   bool
+	IsUnlockedCellData bool
 
 	// ColumnStartIndex is 1-based index: A=1, B=2, C=3, ...
-	ColumnStartIndex    int64
-	Columns             []GoogleSheetUpdateColumn
-	ApplyFilter         bool
-	IsAutoResizeColumns bool
-	IsTextWraping       bool
+	ColumnStartIndex     int64
+	Columns              []GoogleSheetUpdateColumn
+	ApplyFilter          bool
+	IsAutoResizeColumns  bool
+	IsTextWraping        bool
+	IsLockedCellColumn   bool
+	IsUnlockedCellColumn bool
 }
 
 type GoogleSheetUpdateData struct {

@@ -22,6 +22,12 @@ func WithGoogleSheetReadColumnIncludeValidData(includeValidData bool) GoogleShee
 	})
 }
 
+func WithGoogleSheetReadColumnIgnoreUserEnteredFormat(ignoreUserEnteredFormat bool) GoogleSheetReadColumnOption {
+	return googleSheetReadColumnOptionFunc(func(o *GoogleSheetReadColumn) {
+		o.IgnoreUserEnteredFormat = ignoreUserEnteredFormat
+	})
+}
+
 type GoogleSheetReadColumn struct {
 	// ExcludeEmptyColumn is used to exclude empty column from the result
 	// Default is false, only use either ExcludeEmptyColumn or IncludeValidData
@@ -30,4 +36,8 @@ type GoogleSheetReadColumn struct {
 	// IncludeValidData is used to check all maximum possible valid data on each column from the entire row
 	// Default is false, only use either IncludeValidData or ExcludeEmptyColumn
 	IncludeValidData bool
+
+	// IgnoreUserEnteredFormat is used to ignore user entered format
+	// Default is false
+	IgnoreUserEnteredFormat bool
 }
