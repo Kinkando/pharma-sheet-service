@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
-	"time"
 
 	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
@@ -23,7 +22,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/xuri/excelize/v2"
-	"go.uber.org/ratelimit"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -607,13 +605,15 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	columns, err := s.sheet.ReadColumns(ctx, sheet)
+	columns, err := s.sheet.ReadColumns(ctx, sheet, option.WithGoogleSheetReadColumnIgnoreUserEnteredFormat(true))
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	columnIDIndex := slices.Index(columns, "รหัส")
+	columnIDIndex := slices.IndexFunc(columns, func(column option.GoogleSheetUpdateColumn) bool {
+		return column.Value == "รหัส"
+	})
 	isFoundColumnID := columnIDIndex != -1
 	if !isFoundColumnID {
 		columnIDIndex = len(columns)
@@ -653,7 +653,6 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		medicineMapping[medicine.MedicineID] = medicine
 	}
 
-	rateLimit := ratelimit.New(20, ratelimit.Per(time.Minute))
 	for index, medicineSheet := range medicineSheets {
 		locker, ok := lockerID[medicineSheet.LockerName]
 		if !ok {
@@ -710,8 +709,6 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		}
 
 		col, _ := excelize.ColumnNumberToName(columnIDIndex + 1)
-
-		rateLimit.Take()
 		err = s.sheet.Update(
 			ctx,
 			spreadsheetID,

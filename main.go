@@ -15,9 +15,11 @@ import (
 	httpmiddleware "github.com/kinkando/pharma-sheet-service/pkg/http/middleware"
 	httpserver "github.com/kinkando/pharma-sheet-service/pkg/http/server"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/option"
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/kinkando/pharma-sheet-service/service"
 	"github.com/labstack/echo/v4"
+	"go.uber.org/ratelimit"
 )
 
 func main() {
@@ -53,7 +55,10 @@ func main() {
 	cloudStorage := google.NewStorage([]byte(cfg.Google.FirebaseCredential), cfg.Google.Storage.BucketName, cfg.Google.Storage.ExpiredTime)
 	defer cloudStorage.Shutdown()
 
-	sheet := google.NewSheet([]byte(cfg.Google.FirebaseCredential))
+	sheet := google.NewSheet(
+		option.WithGoogleSheetClientCredentialJSON([]byte(cfg.Google.FirebaseCredential)),
+		option.WithGoogleSheetClientRateLimiter(ratelimit.New(60, ratelimit.Per(time.Minute))),
+	)
 
 	firebaseAuthen := google.NewFirebaseAuthen([]byte(cfg.Google.FirebaseCredential))
 
