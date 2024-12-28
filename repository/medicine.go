@@ -25,6 +25,7 @@ type Medicine interface {
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicineID string, err error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
 	DeleteMedicine(ctx context.Context, filter model.DeleteMedicineFilter) (int64, error)
+	UpsertMedicine(ctx context.Context, req model.Medicine) error
 }
 
 type medicine struct {
@@ -250,13 +251,6 @@ func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineR
 		CreatedAt:   time.Now(),
 	}
 
-	if medicine.MedicalName != nil && (strings.TrimSpace(*medicine.MedicalName) == "" || strings.TrimSpace(*medicine.MedicalName) == "-") {
-		medicine.MedicalName = nil
-	}
-	if medicine.Label != nil && (strings.TrimSpace(*medicine.Label) == "" || strings.TrimSpace(*medicine.Label) == "-") {
-		medicine.Label = nil
-	}
-
 	sql, args := medicines.INSERT(
 		medicines.MedicineID,
 		medicines.WarehouseID,
@@ -285,23 +279,8 @@ func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineR
 func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error {
 	medicines := table.Medicines
 
-	columnNames := postgres.ColumnList{
-		medicines.LockerID,
-		medicines.Floor,
-		medicines.No,
-		medicines.Address,
-		medicines.Description,
-		medicines.UpdatedAt,
-	}
-
-	columnValues := []any{
-		postgres.UUID(uuid.MustParse(req.LockerID)),
-		postgres.Int32(req.Floor),
-		postgres.Int32(req.No),
-		postgres.String(req.Address),
-		postgres.String(req.Description),
-		postgres.TimestampzT(time.Now()),
-	}
+	columnNames := postgres.ColumnList{medicines.UpdatedAt}
+	columnValues := []any{postgres.TimestampzT(time.Now())}
 
 	if req.ImageURL != nil && *req.ImageURL == "null" {
 		columnNames = append(columnNames, medicines.ImageURL)
@@ -311,20 +290,43 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 		columnValues = append(columnValues, postgres.String(*req.ImageURL))
 	}
 
-	if req.MedicalName != nil && (strings.TrimSpace(*req.MedicalName) == "" || strings.TrimSpace(*req.MedicalName) == "-") {
-		columnNames = append(columnNames, medicines.MedicalName)
-		columnValues = append(columnValues, postgres.NULL)
-	} else if req.MedicalName != nil {
-		columnNames = append(columnNames, medicines.MedicalName)
-		columnValues = append(columnValues, postgres.String(*req.MedicalName))
+	if req.LockerID != "" {
+		columnNames = append(columnNames, medicines.LockerID)
+		columnValues = append(columnValues, postgres.UUID(uuid.MustParse(req.LockerID)))
 	}
 
-	if req.Label != nil && (strings.TrimSpace(*req.Label) == "" || strings.TrimSpace(*req.Label) == "-") {
+	if req.Floor != 0 {
+		columnNames = append(columnNames, medicines.Floor)
+		columnValues = append(columnValues, postgres.Int32(req.Floor))
+	}
+
+	if req.No != 0 {
+		columnNames = append(columnNames, medicines.No)
+		columnValues = append(columnValues, postgres.Int32(req.No))
+	}
+
+	if req.Address != "" {
+		columnNames = append(columnNames, medicines.Address)
+		columnValues = append(columnValues, postgres.String(req.Address))
+	}
+
+	if req.Description != "" {
+		columnNames = append(columnNames, medicines.Description)
+		columnValues = append(columnValues, postgres.String(req.Description))
+	}
+
+	if req.MedicalName != "" {
+		columnNames = append(columnNames, medicines.MedicalName)
+		columnValues = append(columnValues, postgres.String(req.MedicalName))
+	}
+
+	if req.Label != "" {
 		columnNames = append(columnNames, medicines.Label)
-		columnValues = append(columnValues, postgres.NULL)
-	} else if req.Label != nil {
-		columnNames = append(columnNames, medicines.Label)
-		columnValues = append(columnValues, postgres.String(*req.Label))
+		columnValues = append(columnValues, postgres.String(req.Label))
+	}
+
+	if len(columnValues) == 1 {
+		return nil
 	}
 
 	sql, args := medicines.
@@ -332,6 +334,66 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 		SET(columnValues[0], columnValues[1:]...).
 		WHERE(medicines.MedicineID.EQ(postgres.UUID(uuid.MustParse(req.MedicineID)))).
 		Sql()
+	_, err := r.pgPool.Exec(ctx, sql, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *medicine) UpsertMedicine(ctx context.Context, req model.Medicine) error {
+	medicines := table.Medicines
+
+	if req.MedicineID == "" {
+		req.MedicineID = generator.UUID()
+	}
+
+	now := time.Now()
+	medicine := genmodel.Medicines{
+		MedicineID:  uuid.MustParse(req.MedicineID),
+		WarehouseID: uuid.MustParse(req.WarehouseID),
+		LockerID:    uuid.MustParse(req.LockerID),
+		Floor:       req.Floor,
+		No:          req.No,
+		Address:     req.Address,
+		Description: req.Description,
+		MedicalName: req.MedicalName,
+		Label:       req.Label,
+		ImageURL:    req.ImageURL,
+		CreatedAt:   now,
+	}
+
+	sql, args := medicines.
+		INSERT(
+			medicines.MedicineID,
+			medicines.WarehouseID,
+			medicines.LockerID,
+			medicines.Floor,
+			medicines.No,
+			medicines.Address,
+			medicines.Description,
+			medicines.MedicalName,
+			medicines.Label,
+			medicines.ImageURL,
+			medicines.CreatedAt,
+		).
+		MODEL(medicine).
+		ON_CONFLICT(medicines.WarehouseID, medicines.LockerID, medicines.Floor, medicines.No).
+		DO_UPDATE(postgres.SET(
+			medicines.WarehouseID.SET(postgres.UUID(medicine.WarehouseID)),
+			medicines.LockerID.SET(postgres.UUID(medicine.LockerID)),
+			medicines.Floor.SET(postgres.Int32(medicine.Floor)),
+			medicines.No.SET(postgres.Int32(medicine.No)),
+			medicines.Address.SET(postgres.String(medicine.Address)),
+			medicines.Description.SET(postgres.String(medicine.Description)),
+			medicines.MedicalName.SET(postgres.String(medicine.MedicalName)),
+			medicines.Label.SET(postgres.String(medicine.Label)),
+			medicines.UpdatedAt.SET(postgres.TimestampzT(now)),
+		)).
+		Sql()
+
 	_, err := r.pgPool.Exec(ctx, sql, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)

@@ -16,12 +16,10 @@ import (
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
-	"github.com/kinkando/pharma-sheet-service/pkg/option"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/labstack/echo/v4"
 	"github.com/sourcegraph/conc/pool"
-	"github.com/xuri/excelize/v2"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -605,34 +603,6 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	columns, err := s.sheet.ReadColumns(ctx, sheet, option.WithGoogleSheetReadColumnIgnoreUserEnteredFormat(true))
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
-
-	columnIDIndex := slices.IndexFunc(columns, func(column option.GoogleSheetUpdateColumn) bool {
-		return column.Value == "รหัส"
-	})
-	isFoundColumnID := columnIDIndex != -1
-	if !isFoundColumnID {
-		columnIDIndex = len(columns)
-		err = s.sheet.Update(
-			ctx,
-			spreadsheetID,
-			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
-			option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
-			option.WithGoogleSheetUpdateColumns([]option.GoogleSheetUpdateColumn{{Value: "รหัส", Width: 500}}),
-			option.WithGoogleSheetUpdateColumnStartIndex(int64(columnIDIndex)+1),
-			option.WithGoogleSheetUpdateIsTextWraping(true),
-			option.WithGoogleSheetUpdateFontSize(20),
-		)
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-		}
-	}
-
 	lockers, err := s.lockerRepository.GetLockers(ctx, req.WarehouseID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -650,10 +620,10 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 	}
 	medicineMapping := make(map[string]model.Medicine)
 	for _, medicine := range medicines {
-		medicineMapping[medicine.MedicineID] = medicine
+		medicineMapping[medicine.Address] = medicine
 	}
 
-	for index, medicineSheet := range medicineSheets {
+	for _, medicineSheet := range medicineSheets {
 		locker, ok := lockerID[medicineSheet.LockerName]
 		if !ok {
 			lockerID[medicineSheet.LockerName], err = s.lockerRepository.CreateLocker(ctx, genmodel.Lockers{
@@ -667,31 +637,13 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 			locker = lockerID[medicineSheet.LockerName]
 		}
 
-		if medicineSheet.MedicineID != "" {
-			medicine, ok := medicineMapping[medicineSheet.MedicineID]
-			if ok {
-				if locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine) {
-					continue
-				}
-				err = s.medicineRepository.UpdateMedicine(ctx, model.UpdateMedicineRequest{
-					MedicineID:  medicineSheet.MedicineID,
-					LockerID:    locker,
-					Floor:       medicineSheet.Floor,
-					No:          medicineSheet.No,
-					Address:     medicineSheet.Address,
-					Description: medicineSheet.Description,
-					MedicalName: medicineSheet.MedicalName,
-					Label:       medicineSheet.Label,
-				})
-				if err != nil {
-					logger.Context(ctx).Error(err)
-					// return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-				}
-				continue
-			}
+		medicine, ok := medicineMapping[medicineSheet.Address]
+		if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine) {
+			continue
 		}
 
-		req := model.CreateMedicineRequest{
+		err = s.medicineRepository.UpsertMedicine(ctx, model.Medicine{
+			MedicineID:  medicineSheet.MedicineID,
 			WarehouseID: req.WarehouseID,
 			LockerID:    locker,
 			Floor:       medicineSheet.Floor,
@@ -700,28 +652,9 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 			Description: medicineSheet.Description,
 			MedicalName: medicineSheet.MedicalName,
 			Label:       medicineSheet.Label,
-		}
-
-		medicineID, err := s.medicineRepository.CreateMedicine(ctx, req)
+		})
 		if err != nil {
 			logger.Context(ctx).Error(err)
-			continue
-		}
-
-		col, _ := excelize.ColumnNumberToName(columnIDIndex + 1)
-		err = s.sheet.Update(
-			ctx,
-			spreadsheetID,
-			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
-			option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
-			option.WithGoogleSheetUpdateData([][]option.GoogleSheetUpdateData{{{Value: medicineID}}}),
-			option.WithGoogleSheetUpdateIsTextWraping(true),
-			option.WithGoogleSheetUpdateFontSize(20),
-			option.WithGoogleSheetUpdateStartCellRange(fmt.Sprintf("%s%d", col, index+2)),
-		)
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 		}
 	}
 	return nil

@@ -3,7 +3,6 @@ package model
 import (
 	"encoding/json"
 	"mime/multipart"
-	"strings"
 )
 
 type Medicine struct {
@@ -15,8 +14,8 @@ type Medicine struct {
 	No          int32   `json:"no"`
 	Address     string  `json:"address"`
 	Description string  `json:"description"`
-	MedicalName *string `json:"medicalName,omitempty"`
-	Label       *string `json:"label,omitempty"`
+	MedicalName string  `json:"medicalName,omitempty"`
+	Label       string  `json:"label,omitempty"`
 	ImageURL    *string `json:"imageURL,omitempty"`
 }
 
@@ -32,28 +31,28 @@ type ListMedicine struct {
 }
 
 type CreateMedicineRequest struct {
-	WarehouseID string  `form:"warehouseID" validate:"required"`
-	LockerID    string  `form:"lockerID" validate:"required,uuid"`
-	Floor       int32   `form:"floor" validate:"omitempty,min=0"`
-	No          int32   `form:"no" validate:"omitempty,min=0"`
-	Address     string  `form:"address" validate:"required"`
-	Description string  `form:"description" validate:"required"`
-	MedicalName *string `form:"medicalName"`
-	Label       *string `form:"label"`
+	WarehouseID string `form:"warehouseID" validate:"required"`
+	LockerID    string `form:"lockerID" validate:"required,uuid"`
+	Floor       int32  `form:"floor" validate:"omitempty,min=1"`
+	No          int32  `form:"no" validate:"omitempty,min=1"`
+	Address     string `form:"address" validate:"required"`
+	Description string `form:"description" validate:"required"`
+	MedicalName string `form:"medicalName" validate:"required"`
+	Label       string `form:"label" validate:"required"`
 	File        *multipart.FileHeader
 	ImageURL    *string
 }
 
 type UpdateMedicineRequest struct {
-	MedicineID  string  `param:"medicineID" validate:"required"`
-	LockerID    string  `form:"lockerID" validate:"required,uuid"`
-	Floor       int32   `form:"floor" validate:"omitempty,min=0"`
-	No          int32   `form:"no" validate:"omitempty,min=0"`
-	Address     string  `form:"address" validate:"required"`
-	Description string  `form:"description" validate:"required"`
-	MedicalName *string `form:"medicalName" validate:"required"`
-	Label       *string `form:"label" validate:"required"`
-	DeleteImage bool    `form:"deleteImage"`
+	MedicineID  string `param:"medicineID" validate:"required"`
+	LockerID    string `form:"lockerID" validate:"required,uuid"`
+	Floor       int32  `form:"floor" validate:"omitempty,min=1"`
+	No          int32  `form:"no" validate:"omitempty,min=1"`
+	Address     string `form:"address" validate:"required"`
+	Description string `form:"description" validate:"required"`
+	MedicalName string `form:"medicalName" validate:"required"`
+	Label       string `form:"label" validate:"required"`
+	DeleteImage bool   `form:"deleteImage"`
 	File        *multipart.FileHeader
 	ImageURL    *string
 }
@@ -65,26 +64,18 @@ type DeleteMedicineFilter struct {
 }
 
 type MedicineSheet struct {
-	MedicineID  string  `csv:"รหัส" json:"medicineID"`
-	LockerName  string  `csv:"ตู้" json:"lockerName"`
-	Floor       int32   `csv:"ชั้น" json:"floor"`
-	No          int32   `csv:"ลำดับที่" json:"no"`
-	Address     string  `csv:"บ้านเลขที่ยา" json:"address"`
-	Description string  `csv:"ชื่อสามัญทางยา" json:"description"`
-	MedicalName *string `csv:"ชื่อการค้า" json:"medicalName"`
-	Label       *string `csv:"Label ตะกร้า" json:"label"`
+	MedicineID  string `csv:"รหัส" json:"medicineID"`
+	LockerName  string `csv:"ตู้" json:"lockerName"`
+	Floor       int32  `csv:"ชั้น" json:"floor"`
+	No          int32  `csv:"ลำดับที่" json:"no"`
+	Address     string `csv:"บ้านเลขที่ยา" json:"address"`
+	Description string `csv:"ชื่อสามัญทางยา" json:"description"`
+	MedicalName string `csv:"ชื่อการค้า" json:"medicalName,omitempty"`
+	Label       string `csv:"Label ตะกร้า" json:"label,omitempty"`
 }
 
 func (m *MedicineSheet) IsDifferent(medicineReq Medicine) bool {
-	if m.MedicalName != nil && (strings.TrimSpace(*m.MedicalName) == "" || strings.TrimSpace(*m.MedicalName) == "-") {
-		m.MedicalName = nil
-	}
-	if m.Label != nil && (strings.TrimSpace(*m.Label) == "" || strings.TrimSpace(*m.Label) == "-") {
-		m.Label = nil
-	}
-
 	medicine := MedicineSheet{
-		MedicineID:  medicineReq.MedicineID,
 		LockerName:  m.LockerName,
 		Floor:       medicineReq.Floor,
 		No:          medicineReq.No,

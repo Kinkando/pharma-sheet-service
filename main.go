@@ -57,7 +57,7 @@ func main() {
 
 	sheet := google.NewSheet(
 		option.WithGoogleSheetClientCredentialJSON([]byte(cfg.Google.FirebaseCredential)),
-		option.WithGoogleSheetClientRateLimiter(ratelimit.New(60, ratelimit.Per(time.Minute))),
+		option.WithGoogleSheetClientRateLimiter(ratelimit.New(60, ratelimit.Per(time.Minute))), // but 20 requests per minute is ensured
 	)
 
 	firebaseAuthen := google.NewFirebaseAuthen([]byte(cfg.Google.FirebaseCredential))

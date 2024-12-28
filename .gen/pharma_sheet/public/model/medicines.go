@@ -20,8 +20,8 @@ type Medicines struct {
 	No          int32
 	Address     string
 	Description string
-	MedicalName *string
-	Label       *string
+	MedicalName string
+	Label       string
 	ImageURL    *string
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
