@@ -682,19 +682,34 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 				continue
 			}
 
-			err = s.medicineRepository.UpsertMedicine(ctx, model.Medicine{
-				MedicineID:  medicineSheet.MedicineID,
-				WarehouseID: req.WarehouseID,
-				LockerID:    locker,
-				Floor:       medicineSheet.Floor,
-				No:          medicineSheet.No,
-				Address:     medicineSheet.Address,
-				Description: medicineSheet.Description,
-				MedicalName: medicineSheet.MedicalName,
-				Label:       medicineSheet.Label,
-			})
-			if err != nil {
-				logger.Context(ctx).Error(err)
+			if ok {
+				err = s.medicineRepository.UpdateMedicine(ctx, model.UpdateMedicineRequest{
+					MedicineID:  medicine.MedicineID,
+					LockerID:    locker,
+					Floor:       medicineSheet.Floor,
+					No:          medicineSheet.No,
+					Address:     medicineSheet.Address,
+					Description: medicineSheet.Description,
+					MedicalName: medicineSheet.MedicalName,
+					Label:       medicineSheet.Label,
+				})
+				if err != nil {
+					logger.Context(ctx).Error(err)
+				}
+			} else {
+				_, err = s.medicineRepository.CreateMedicine(ctx, model.CreateMedicineRequest{
+					WarehouseID: req.WarehouseID,
+					LockerID:    locker,
+					Floor:       medicineSheet.Floor,
+					No:          medicineSheet.No,
+					Address:     medicineSheet.Address,
+					Description: medicineSheet.Description,
+					MedicalName: medicineSheet.MedicalName,
+					Label:       medicineSheet.Label,
+				})
+				if err != nil {
+					logger.Context(ctx).Error(err)
+				}
 			}
 			continue
 		}
