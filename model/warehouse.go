@@ -27,13 +27,13 @@ type FilterWarehouseDetail struct {
 }
 
 type WarehouseDetail struct {
-	WarehouseID   string               `json:"warehouseID"`
-	Name          string               `json:"warehouseName"`
-	Role          string               `json:"role"`
-	Status        model.ApprovalStatus `json:"status"`
-	LockerDetails []LockerDetail       `json:"lockerDetails"`
-	TotalLocker   uint64               `json:"totalLocker"`
-	TotalMedicine uint64               `json:"totalMedicine"`
+	WarehouseID   string                `json:"warehouseID"`
+	Name          string                `json:"warehouseName"`
+	Role          *string               `json:"role,omitempty"`
+	Status        *model.ApprovalStatus `json:"status,omitempty"`
+	LockerDetails []LockerDetail        `json:"lockerDetails"`
+	TotalLocker   uint64                `json:"totalLocker"`
+	TotalMedicine uint64                `json:"totalMedicine"`
 }
 
 type LockerDetail struct {

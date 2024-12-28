@@ -164,7 +164,7 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 	}
 
 	query, args := table.Warehouses.
-		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
+		LEFT_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID).AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))))).
 		SELECT(postgres.COUNT(table.Warehouses.WarehouseID)).
 		WHERE(condition).
 		Sql()
@@ -179,7 +179,7 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 	}
 
 	query, args = table.Warehouses.
-		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
+		LEFT_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID).AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))))).
 		SELECT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.WarehouseUsers.Role, table.WarehouseUsers.Status).
 		WHERE(condition).
 		LIMIT(int64(filter.Limit)).
