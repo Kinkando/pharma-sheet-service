@@ -200,15 +200,25 @@ func (g *googleSheet) Update(ctx context.Context, spreadsheetID string, opts ...
 		o.Apply(opt)
 	}
 
+	var range_ *sheets.GridRange
+
 	if len(opt.Columns) > 0 {
-		err = g.setHeader(ctx, spreadsheetID, opt)
+		range_, err = g.setHeader(ctx, spreadsheetID, opt)
 		if err != nil {
 			return fmt.Errorf("google: sheet: Update: %v", err)
 		}
 	}
 
 	if len(opt.Data) > 0 {
-		err = g.setData(ctx, spreadsheetID, opt)
+		range_, err = g.setData(ctx, spreadsheetID, opt)
+		if err != nil {
+			return fmt.Errorf("google: sheet: Update: %v", err)
+		}
+	}
+
+	if opt.ApplyFilter && range_ != nil {
+		range_.StartRowIndex = 0
+		err = g.applyFilter(ctx, spreadsheetID, range_)
 		if err != nil {
 			return fmt.Errorf("google: sheet: Update: %v", err)
 		}
@@ -238,7 +248,7 @@ func (g *googleSheet) RenameSheet(ctx context.Context, spreadsheetID string, she
 
 func (g *googleSheet) ReadColumns(ctx context.Context, sheet *sheets.Sheet, opts ...options.GoogleSheetReadColumnOption) (columns []options.GoogleSheetUpdateColumn, err error) {
 	opt := &options.GoogleSheetReadColumn{
-		IncludeValidData:        true,
+		Setting:                 options.GoogleSheetReadColumnSettingExcludeInvalidData,
 		IgnoreUserEnteredFormat: false,
 	}
 	for _, o := range opts {
@@ -250,7 +260,7 @@ func (g *googleSheet) ReadColumns(ctx context.Context, sheet *sheets.Sheet, opts
 	}
 
 	for index, cell := range sheet.Data[0].RowData[0].Values {
-		if cell.FormattedValue == "" && opt.ExcludeEmptyColumn {
+		if cell.FormattedValue == "" && opt.Setting == options.GoogleSheetReadColumnSettingExcludeEmptyCell {
 			continue
 		}
 		columns = append(columns, options.GoogleSheetUpdateColumn{
@@ -260,11 +270,11 @@ func (g *googleSheet) ReadColumns(ctx context.Context, sheet *sheets.Sheet, opts
 		})
 	}
 
-	if opt.ExcludeEmptyColumn {
+	if opt.Setting == options.GoogleSheetReadColumnSettingExcludeEmptyCell {
 		return columns, nil
 	}
 
-	if opt.IncludeValidData && len(sheet.Data[0].RowData) > 1 {
+	if opt.Setting == options.GoogleSheetReadColumnSettingExcludeInvalidData && len(sheet.Data[0].RowData) > 1 {
 		max := math.MinInt64
 		for _, rowData := range sheet.Data[0].RowData[1:] {
 			lastValidColumn := 0
@@ -294,7 +304,7 @@ func (g *googleSheet) ReadColumns(ctx context.Context, sheet *sheets.Sheet, opts
 
 func (g *googleSheet) ReadData(ctx context.Context, sheet *sheets.Sheet, opts ...options.GoogleSheetReadDataOption) ([][]options.GoogleSheetUpdateData, error) {
 	opt := &options.GoogleSheetReadData{
-		IncludeValidData:        true,
+		Setting:                 options.GoogleSheetReadDataSettingExcludeInvalidData,
 		ExcludeEmptyRow:         true,
 		IgnoreUserEnteredFormat: false,
 	}
@@ -309,25 +319,35 @@ func (g *googleSheet) ReadData(ctx context.Context, sheet *sheets.Sheet, opts ..
 	var data [][]options.GoogleSheetUpdateData
 	for _, rowData := range sheet.Data[0].RowData[1:] {
 		var row []options.GoogleSheetUpdateData
-		for _, cell := range rowData.Values {
-			if cell.FormattedValue == "" && opt.ExcludeEmptyCell {
+		lastValidColumn, isEmpty := 0, true
+		for index, cell := range rowData.Values {
+			if cell.FormattedValue == "" && opt.Setting == options.GoogleSheetReadDataSettingExcludeEmptyCell {
 				continue
+			}
+			if cell.FormattedValue != "" {
+				isEmpty = false
+			}
+			if cell.FormattedValue != "" || (cell.UserEnteredFormat != nil && !opt.IgnoreUserEnteredFormat) {
+				lastValidColumn = index
 			}
 			row = append(row, options.GoogleSheetUpdateData{
 				Value:      cell.FormattedValue,
 				CellFormat: cell.UserEnteredFormat,
 			})
 		}
-		if len(row) > 0 || !opt.ExcludeEmptyRow {
+		if len(row) > lastValidColumn+1 {
+			row = row[:lastValidColumn+1]
+		}
+		if !isEmpty || !opt.ExcludeEmptyRow {
 			data = append(data, row)
 		}
 	}
 
-	if opt.ExcludeEmptyCell {
+	if opt.Setting == options.GoogleSheetReadDataSettingExcludeEmptyCell {
 		return data, nil
 	}
 
-	if opt.IncludeValidData {
+	if opt.Setting == options.GoogleSheetReadDataSettingExcludeInvalidData {
 		max := math.MinInt64
 		for _, rowData := range sheet.Data[0].RowData[1:] {
 			lastValidColumn := 0
@@ -553,7 +573,7 @@ func (g *googleSheet) getSheet(ctx context.Context, spreadsheetID, sheetTitle st
 	return sheet, nil
 }
 
-func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *options.GoogleSheetUpdate) error {
+func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *options.GoogleSheetUpdate) (range_ *sheets.GridRange, err error) {
 	cellRange := fmt.Sprintf("%s1:%s1", ColumnNumberToLetter(int(opt.ColumnStartIndex)), ColumnNumberToLetter(len(opt.Columns)+int(opt.ColumnStartIndex)-1))
 	sheetRange := fmt.Sprintf("%s!%s", opt.SheetTitle, cellRange)
 	columns := []any{}
@@ -561,12 +581,12 @@ func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *
 		columns = append(columns, column.Value)
 	}
 	vr := &sheets.ValueRange{Values: [][]any{columns}}
-	_, err := g.sheet.Spreadsheets.Values.Update(spreadsheetID, sheetRange, vr).ValueInputOption(string(opt.ValueInputOption)).Context(ctx).Do()
+	_, err = g.sheet.Spreadsheets.Values.Update(spreadsheetID, sheetRange, vr).ValueInputOption(string(opt.ValueInputOption)).Context(ctx).Do()
 	if err != nil {
-		return fmt.Errorf("unable to set sheet header: %v", err)
+		return range_, fmt.Errorf("unable to set sheet header: %v", err)
 	}
 
-	range_ := sheets.GridRange{
+	range_ = &sheets.GridRange{
 		SheetId:          opt.SheetID,
 		StartRowIndex:    0,
 		EndRowIndex:      1,
@@ -576,7 +596,7 @@ func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *
 
 	err = g.setCellOption(ctx, spreadsheetID, range_, true, opt)
 	if err != nil {
-		return err
+		return
 	}
 
 	averageCharWidth, padding := 7, 10
@@ -589,42 +609,35 @@ func (g *googleSheet) setHeader(ctx context.Context, spreadsheetID string, opt *
 		if width > 0 {
 			err = g.resizeColumnWidth(ctx, spreadsheetID, opt.SheetID, int64(index)+opt.ColumnStartIndex-1, width)
 			if err != nil {
-				return fmt.Errorf("google: sheet: Update: %v", err)
+				return
 			}
-		}
-	}
-
-	if opt.ApplyFilter {
-		err = g.applyFilter(ctx, spreadsheetID, opt.SheetID, opt.ColumnStartIndex-1, int64(len(opt.Columns)))
-		if err != nil {
-			return fmt.Errorf("google: sheet: Update: %v", err)
 		}
 	}
 
 	if opt.IsLockedCell || opt.IsLockedCellColumn {
 		err = g.lockedCell(ctx, spreadsheetID, opt.SheetTitle, range_)
 		if err != nil {
-			return err
+			return
 		}
 
 	} else if opt.IsUnlockedCell || opt.IsUnlockedCellColumn {
 		err = g.unlockedCell(ctx, spreadsheetID, opt.SheetTitle, range_)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
-	return nil
+	return range_, nil
 }
 
-func (g *googleSheet) setData(ctx context.Context, spreadsheetID string, opt *options.GoogleSheetUpdate) error {
+func (g *googleSheet) setData(ctx context.Context, spreadsheetID string, opt *options.GoogleSheetUpdate) (range_ *sheets.GridRange, err error) {
 	if opt.StartCellRange == "A1" {
 		opt.StartCellRange = "A2"
 	}
 	if opt.EndCellRange == "A1" {
 		col, row, err := excelize.CellNameToCoordinates(opt.StartCellRange)
 		if err != nil {
-			return err
+			return range_, err
 		}
 		opt.EndCellRange = getLastCell(opt.Data, row-1, col-1)
 	}
@@ -641,7 +654,7 @@ func (g *googleSheet) setData(ctx context.Context, spreadsheetID string, opt *op
 	if opt.IsAppendData {
 		sheet, err := g.getSheet(ctx, spreadsheetID, opt.SheetTitle, opt.SheetID)
 		if err != nil {
-			return err
+			return range_, err
 		}
 
 		row := 1
@@ -675,16 +688,16 @@ func (g *googleSheet) setData(ctx context.Context, spreadsheetID string, opt *op
 
 	sheetRange := fmt.Sprintf("%s!%s", opt.SheetTitle, cellRange)
 	vr := &sheets.ValueRange{Values: data}
-	_, err := g.sheet.Spreadsheets.Values.Update(spreadsheetID, sheetRange, vr).ValueInputOption(string(opt.ValueInputOption)).Context(ctx).Do()
+	_, err = g.sheet.Spreadsheets.Values.Update(spreadsheetID, sheetRange, vr).ValueInputOption(string(opt.ValueInputOption)).Context(ctx).Do()
 	if err != nil {
-		return fmt.Errorf("unable to update sheet: %v", err)
+		return range_, fmt.Errorf("unable to update sheet: %v", err)
 	}
 
 	cells := strings.Split(cellRange, ":")
 	startColumn, startRow, _ := excelize.CellNameToCoordinates(cells[0])
 	endColumn, endRow, _ := excelize.CellNameToCoordinates(cells[1])
 
-	range_ := sheets.GridRange{
+	range_ = &sheets.GridRange{
 		SheetId:          opt.SheetID,
 		StartRowIndex:    int64(startRow) - 1,
 		EndRowIndex:      int64(endRow),
@@ -694,26 +707,26 @@ func (g *googleSheet) setData(ctx context.Context, spreadsheetID string, opt *op
 
 	err = g.setCellOption(ctx, spreadsheetID, range_, false, opt)
 	if err != nil {
-		return err
+		return range_, err
 	}
 
 	if opt.IsLockedCell || opt.IsLockedCellData {
 		err = g.lockedCell(ctx, spreadsheetID, opt.SheetTitle, range_)
 		if err != nil {
-			return err
+			return range_, err
 		}
 
 	} else if opt.IsUnlockedCell || opt.IsUnlockedCellData {
 		err = g.unlockedCell(ctx, spreadsheetID, opt.SheetTitle, range_)
 		if err != nil {
-			return err
+			return range_, err
 		}
 	}
 
-	return nil
+	return range_, nil
 }
 
-func (g *googleSheet) setCellOption(ctx context.Context, spreadsheetID string, range_ sheets.GridRange, isHeader bool, opt *options.GoogleSheetUpdate) error {
+func (g *googleSheet) setCellOption(ctx context.Context, spreadsheetID string, range_ *sheets.GridRange, isHeader bool, opt *options.GoogleSheetUpdate) error {
 	fields := "userEnteredFormat.textFormat.fontSize"
 	if isHeader {
 		fields += ",userEnteredFormat.textFormat.bold"
@@ -767,7 +780,7 @@ func (g *googleSheet) setCellOption(ctx context.Context, spreadsheetID string, r
 
 	request := &sheets.Request{
 		UpdateCells: &sheets.UpdateCellsRequest{
-			Range:  &range_,
+			Range:  range_,
 			Rows:   rows,
 			Fields: fields,
 		},
@@ -784,17 +797,11 @@ func (g *googleSheet) setCellOption(ctx context.Context, spreadsheetID string, r
 	return nil
 }
 
-func (g *googleSheet) applyFilter(ctx context.Context, spreadsheetID string, sheetID int64, startColumnIndex, columnLength int64) error {
+func (g *googleSheet) applyFilter(ctx context.Context, spreadsheetID string, range_ *sheets.GridRange) error {
 	request := &sheets.Request{
 		SetBasicFilter: &sheets.SetBasicFilterRequest{
 			Filter: &sheets.BasicFilter{
-				Range: &sheets.GridRange{
-					SheetId:          sheetID,                         // The sheet ID to which you want to apply the filter
-					StartRowIndex:    0,                               // The row index to start the filter (0 for the first row)
-					EndRowIndex:      1,                               // The row index to end the filter (1 for the first row)
-					StartColumnIndex: startColumnIndex,                // The column index to start the filter
-					EndColumnIndex:   startColumnIndex + columnLength, // The column index to end the filter
-				},
+				Range: range_,
 			},
 		},
 	}
@@ -810,7 +817,12 @@ func (g *googleSheet) applyFilter(ctx context.Context, spreadsheetID string, she
 	return nil
 }
 
-func (g *googleSheet) lockedCell(ctx context.Context, spreadsheetID, sheetTitle string, range_ sheets.GridRange) error {
+func (g *googleSheet) lockedCell(ctx context.Context, spreadsheetID, sheetTitle string, range_ *sheets.GridRange) error {
+	isInvalidRange := range_.StartRowIndex > range_.EndRowIndex || range_.StartColumnIndex > range_.EndColumnIndex
+	if isInvalidRange {
+		return fmt.Errorf("invalid range: %v", range_)
+	}
+
 	sheet, err := g.getSheet(ctx, spreadsheetID, sheetTitle, range_.SheetId)
 	if err != nil {
 		return err
@@ -820,7 +832,10 @@ func (g *googleSheet) lockedCell(ctx context.Context, spreadsheetID, sheetTitle 
 		isAllIndexMatch := protectedRange.Range.StartRowIndex == range_.StartRowIndex && protectedRange.Range.EndRowIndex == range_.EndRowIndex &&
 			protectedRange.Range.StartColumnIndex == range_.StartColumnIndex && protectedRange.Range.EndColumnIndex == range_.EndColumnIndex
 
-		if isAllIndexMatch {
+		isInRange := range_.StartRowIndex >= protectedRange.Range.StartRowIndex && range_.EndRowIndex <= protectedRange.Range.EndRowIndex &&
+			range_.StartColumnIndex >= protectedRange.Range.StartColumnIndex && range_.EndColumnIndex <= protectedRange.Range.EndColumnIndex
+
+		if isAllIndexMatch || isInRange {
 			return nil
 		}
 	}
@@ -828,14 +843,9 @@ func (g *googleSheet) lockedCell(ctx context.Context, spreadsheetID, sheetTitle 
 	request := &sheets.Request{
 		AddProtectedRange: &sheets.AddProtectedRangeRequest{
 			ProtectedRange: &sheets.ProtectedRange{
-				Range:       &range_,
-				WarningOnly: false,
+				Range: range_,
 				Editors: &sheets.Editors{
-					// Add 'allAuthenticatedUsers' to allow all users to modify or remove the protection
-					Users:              []string{},
-					Groups:             []string{},
-					DomainUsersCanEdit: true, // This makes sure only explicitly added users can edit, so we don’t inadvertently grant access
-					// 'allAuthenticatedUsers' allows everyone to remove the protection
+					Users: []string{},
 				},
 			},
 		},
@@ -852,7 +862,7 @@ func (g *googleSheet) lockedCell(ctx context.Context, spreadsheetID, sheetTitle 
 	return nil
 }
 
-func (g *googleSheet) unlockedCell(ctx context.Context, spreadsheetID, sheetTitle string, range_ sheets.GridRange) error {
+func (g *googleSheet) unlockedCell(ctx context.Context, spreadsheetID, sheetTitle string, range_ *sheets.GridRange) error {
 	sheet, err := g.getSheet(ctx, spreadsheetID, sheetTitle, range_.SheetId)
 	if err != nil {
 		return err

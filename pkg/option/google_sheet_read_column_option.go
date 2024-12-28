@@ -1,5 +1,17 @@
 package option
 
+const (
+	// GoogleSheetReadColumnSettingNone is none setting
+	GoogleSheetReadColumnSettingNone int = iota
+
+	// GoogleSheetReadColumnSettingExcludeEmptyCell is used to exclude empty cell from the result
+	GoogleSheetReadColumnSettingExcludeEmptyCell
+
+	// GoogleSheetReadColumnSettingExcludeInvalidData is used to check all valid data on each column from the entire row and exclude invalid data
+	// Default setting
+	GoogleSheetReadColumnSettingExcludeInvalidData
+)
+
 type GoogleSheetReadColumnOption interface {
 	Apply(*GoogleSheetReadColumn)
 }
@@ -10,15 +22,9 @@ func (f googleSheetReadColumnOptionFunc) Apply(o *GoogleSheetReadColumn) {
 	f(o)
 }
 
-func WithGoogleSheetReadColumnExcludeEmptyColumn(excludeEmptyColumn bool) GoogleSheetReadColumnOption {
+func WithGoogleSheetReadColumnSetting(setting int) GoogleSheetReadColumnOption {
 	return googleSheetReadColumnOptionFunc(func(o *GoogleSheetReadColumn) {
-		o.ExcludeEmptyColumn = excludeEmptyColumn
-	})
-}
-
-func WithGoogleSheetReadColumnIncludeValidData(includeValidData bool) GoogleSheetReadColumnOption {
-	return googleSheetReadColumnOptionFunc(func(o *GoogleSheetReadColumn) {
-		o.IncludeValidData = includeValidData
+		o.Setting = setting
 	})
 }
 
@@ -29,13 +35,9 @@ func WithGoogleSheetReadColumnIgnoreUserEnteredFormat(ignoreUserEnteredFormat bo
 }
 
 type GoogleSheetReadColumn struct {
-	// ExcludeEmptyColumn is used to exclude empty column from the result
-	// Default is false, only use either ExcludeEmptyColumn or IncludeValidData
-	ExcludeEmptyColumn bool
-
-	// IncludeValidData is used to check all maximum possible valid data on each column from the entire row
-	// Default is false, only use either IncludeValidData or ExcludeEmptyColumn
-	IncludeValidData bool
+	// Setting of read column
+	// Default is GoogleSheetReadColumnSettingExcludeInvalidData
+	Setting int
 
 	// IgnoreUserEnteredFormat is used to ignore user entered format
 	// Default is false
