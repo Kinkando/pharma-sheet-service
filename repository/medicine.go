@@ -279,8 +279,26 @@ func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineR
 func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error {
 	medicines := table.Medicines
 
-	columnNames := postgres.ColumnList{medicines.UpdatedAt}
-	columnValues := []any{postgres.TimestampzT(time.Now())}
+	columnNames := postgres.ColumnList{
+		medicines.LockerID,
+		medicines.Floor,
+		medicines.No,
+		medicines.Address,
+		medicines.Description,
+		medicines.MedicalName,
+		medicines.Label,
+		medicines.UpdatedAt,
+	}
+	columnValues := []any{
+		postgres.UUID(uuid.MustParse(req.LockerID)),
+		postgres.Int32(req.Floor),
+		postgres.Int32(req.No),
+		postgres.String(req.Address),
+		postgres.String(req.Description),
+		postgres.String(req.MedicalName),
+		postgres.String(req.Label),
+		postgres.TimestampzT(time.Now()),
+	}
 
 	if req.ImageURL != nil && *req.ImageURL == "null" {
 		columnNames = append(columnNames, medicines.ImageURL)
@@ -288,45 +306,6 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 	} else if req.ImageURL != nil {
 		columnNames = append(columnNames, medicines.ImageURL)
 		columnValues = append(columnValues, postgres.String(*req.ImageURL))
-	}
-
-	if req.LockerID != "" {
-		columnNames = append(columnNames, medicines.LockerID)
-		columnValues = append(columnValues, postgres.UUID(uuid.MustParse(req.LockerID)))
-	}
-
-	if req.Floor != 0 {
-		columnNames = append(columnNames, medicines.Floor)
-		columnValues = append(columnValues, postgres.Int32(req.Floor))
-	}
-
-	if req.No != 0 {
-		columnNames = append(columnNames, medicines.No)
-		columnValues = append(columnValues, postgres.Int32(req.No))
-	}
-
-	if req.Address != "" {
-		columnNames = append(columnNames, medicines.Address)
-		columnValues = append(columnValues, postgres.String(req.Address))
-	}
-
-	if req.Description != "" {
-		columnNames = append(columnNames, medicines.Description)
-		columnValues = append(columnValues, postgres.String(req.Description))
-	}
-
-	if req.MedicalName != "" {
-		columnNames = append(columnNames, medicines.MedicalName)
-		columnValues = append(columnValues, postgres.String(req.MedicalName))
-	}
-
-	if req.Label != "" {
-		columnNames = append(columnNames, medicines.Label)
-		columnValues = append(columnValues, postgres.String(req.Label))
-	}
-
-	if len(columnValues) == 1 {
-		return nil
 	}
 
 	sql, args := medicines.
