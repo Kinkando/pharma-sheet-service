@@ -31,7 +31,7 @@ type Warehouse interface {
 	GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (model.PagingWithMetadata[model.WarehouseDetail], error)
 	CreateWarehouse(ctx context.Context, req model.CreateWarehouseRequest) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.UpdateWarehouseRequest) error
-	DeleteWarehouse(ctx context.Context, warehouseID string) error
+	DeleteWarehouse(ctx context.Context, warehouseID string, bypass ...bool) error
 
 	CreateWarehouseLocker(ctx context.Context, req model.CreateWarehouseLockerRequest) (string, error)
 	UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error
@@ -42,6 +42,7 @@ type Warehouse interface {
 	UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error
 	DeleteWarehouseUser(ctx context.Context, req model.DeleteWarehouseUserRequest) error
 	JoinWarehouse(ctx context.Context, warehouseID, userID string) error
+	LeaveWarehouse(ctx context.Context, warehouseID, userID string) error
 	ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 	RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 
@@ -203,11 +204,13 @@ func (s *warehouse) UpdateWarehouse(ctx context.Context, req model.UpdateWarehou
 	return nil
 }
 
-func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) error {
-	err := s.checkWarehouseManagementRole(ctx, warehouseID, genmodel.Role_Admin)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
+func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string, bypass ...bool) error {
+	if len(bypass) != 1 || !bypass[0] {
+		err := s.checkWarehouseManagementRole(ctx, warehouseID, genmodel.Role_Admin)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return err
+		}
 	}
 
 	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: warehouseID})
@@ -253,10 +256,13 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) err
 
 	err = s.warehouseRepository.DeleteWarehouseUser(ctx, warehouseID, nil)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		logger.Context(ctx).Error(err)
 	}
 
-	s.warehouseRepository.DeleteWarehouseSheet(ctx, warehouseID)
+	err = s.warehouseRepository.DeleteWarehouseSheet(ctx, warehouseID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+	}
 
 	err = s.warehouseRepository.DeleteWarehouse(ctx, warehouseID)
 	if err != nil {
@@ -492,6 +498,30 @@ func (s *warehouse) DeleteWarehouseUser(ctx context.Context, req model.DeleteWar
 
 func (s *warehouse) JoinWarehouse(ctx context.Context, warehouseID, userID string) error {
 	return s.warehouseRepository.CreateWarehouseUser(ctx, warehouseID, userID, genmodel.Role_Viewer, genmodel.ApprovalStatus_Pending)
+}
+
+func (s *warehouse) LeaveWarehouse(ctx context.Context, warehouseID, userID string) error {
+	err := s.warehouseRepository.DeleteWarehouseUser(ctx, warehouseID, &userID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	_, total, err := s.warehouseRepository.GetWarehouseUsers(ctx, warehouseID, model.FilterWarehouseUser{
+		Pagination: model.Pagination{Page: 1, Limit: 1},
+		Role:       genmodel.Role_Admin,
+		Status:     genmodel.ApprovalStatus_Approved,
+	})
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
+
+	if total == 0 {
+		return s.DeleteWarehouse(ctx, warehouseID, true)
+	}
+
+	return nil
 }
 
 func (s *warehouse) ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error {

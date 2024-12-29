@@ -43,6 +43,7 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 	warehouseUserRoute.PATCH("/:userID/reject", handler.rejectUser)
 	warehouseUserRoute.POST("", handler.createWarehouseUser)
 	warehouseUserRoute.POST("/join", handler.joinWarehouse)
+	warehouseUserRoute.POST("/leave", handler.leaveWarehouse)
 	warehouseUserRoute.PUT("/:userID/:role", handler.updateWarehouseUser)
 	warehouseUserRoute.DELETE("/:userID", handler.deleteWarehouseUser)
 }
@@ -341,6 +342,34 @@ func (h *WarehouseHandler) joinWarehouse(c echo.Context) error {
 	}
 
 	err = h.warehouseService.JoinWarehouse(ctx, req.WarehouseID, userProfile.UserID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *WarehouseHandler) leaveWarehouse(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.WarehouseRequest
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+	}
+
+	err = h.warehouseService.LeaveWarehouse(ctx, req.WarehouseID, userProfile.UserID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
