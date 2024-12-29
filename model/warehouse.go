@@ -35,6 +35,7 @@ type WarehouseDetail struct {
 	LockerDetails []LockerDetail        `json:"lockerDetails"`
 	TotalLocker   uint64                `json:"totalLocker"`
 	TotalMedicine uint64                `json:"totalMedicine"`
+	Users         []WarehouseUser       `json:"users,omitempty"`
 }
 
 type LockerDetail struct {

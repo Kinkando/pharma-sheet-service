@@ -164,6 +164,17 @@ func (s *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 		data[index].LockerDetails = warehouseLockers
 		data[index].TotalLocker = uint64(len(lockers))
 		data[index].TotalMedicine = uint64(len(medicines))
+
+		if !filter.MyWarehouse {
+			result, err := s.GetWarehouseUsers(ctx, warehouse.WarehouseID, model.FilterWarehouseUser{Pagination: model.Pagination{
+				Page:  1,
+				Limit: 9999,
+			}})
+			if err != nil {
+				return res, err
+			}
+			data[index].Users = result.Data
+		}
 	}
 
 	res = model.PaginationResponse(data, filter.Pagination, total)
