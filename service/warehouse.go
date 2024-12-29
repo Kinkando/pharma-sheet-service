@@ -45,6 +45,7 @@ type Warehouse interface {
 	ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 	RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 
+	SummarizeMedicineFromGoogleSheet(ctx context.Context, req model.GetSyncMedicineMetadataRequest) (model.SyncMedicineMetadata, error)
 	SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error
 }
 
@@ -558,35 +559,41 @@ func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseU
 	return nil
 }
 
-func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+func (s *warehouse) SummarizeMedicineFromGoogleSheet(ctx context.Context, req model.GetSyncMedicineMetadataRequest) (metadata model.SyncMedicineMetadata, err error) {
+	sheet, title, _, _, err := s.getGoogleSheetData(ctx, model.SyncMedicineRequest{WarehouseID: req.WarehouseID, URL: req.URL})
+	if err != nil {
+		return
+	}
+
+	var medicineSheets []model.MedicineSheet
+	_, err = s.sheet.Read(ctx, sheet, &medicineSheets)
 	if err != nil {
 		logger.Context(ctx).Error(err)
+		return metadata, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	metadata = model.SyncMedicineMetadata{
+		Title:         title,
+		SheetName:     sheet.Properties.Title,
+		TotalMedicine: uint64(len(medicineSheets)),
+	}
+
+	return metadata, nil
+}
+
+func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error {
+	sheet, _, spreadsheetID, sheetID, err := s.getGoogleSheetData(ctx, req)
+	if err != nil {
 		return err
 	}
 
-	spreadsheetID, sheetID, err := extractSpreadsheetInfo(req.URL)
+	isConflict, err := s.warehouseRepository.CheckConflictWarehouseSheet(ctx, req.WarehouseID, spreadsheetID, sheetID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
+		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
-
-	spreadsheet, err := s.sheet.Get(ctx, spreadsheetID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
-	}
-
-	var sheet *sheets.Sheet
-	for _, spreadSheet := range spreadsheet.Sheets {
-		if spreadSheet.Properties.SheetId == int64(sheetID) {
-			sheet = spreadSheet
-			break
-		}
-	}
-	if sheet == nil {
-		logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
-		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "sheetID is not found"})
+	if isConflict {
+		return echo.NewHTTPError(http.StatusConflict, echo.Map{"error": "sheet is already sync by another warehouse"})
 	}
 
 	warehouseSheet := genmodel.WarehouseSheets{
@@ -771,6 +778,40 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		}
 	}
 	return nil
+}
+
+func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedicineRequest) (*sheets.Sheet, string, string, int32, error) {
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, "", "", 0, err
+	}
+
+	spreadsheetID, sheetID, err := extractSpreadsheetInfo(req.URL)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, "", "", 0, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
+	}
+
+	spreadsheet, err := s.sheet.Get(ctx, spreadsheetID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, "", "", 0, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
+	}
+
+	var sheet *sheets.Sheet
+	for _, spreadSheet := range spreadsheet.Sheets {
+		if spreadSheet.Properties.SheetId == int64(sheetID) {
+			sheet = spreadSheet
+			break
+		}
+	}
+	if sheet == nil {
+		logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
+		return nil, "", "", 0, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "sheetID is not found"})
+	}
+
+	return sheet, spreadsheet.Properties.Title, spreadsheetID, sheetID, nil
 }
 
 func extractSpreadsheetInfo(url string) (string, int32, error) {

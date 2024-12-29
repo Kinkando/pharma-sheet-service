@@ -37,6 +37,7 @@ type Warehouse interface {
 	UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error
 	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
 
+	CheckConflictWarehouseSheet(ctx context.Context, warehouseID string, spreadsheetID string, sheetID int32) (bool, error)
 	UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.WarehouseSheets) error
 	DeleteWarehouseSheet(ctx context.Context, warehouseID string) error
 }
@@ -487,6 +488,25 @@ func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID string,
 	}
 
 	return nil
+}
+
+func (r *warehouse) CheckConflictWarehouseSheet(ctx context.Context, warehouseID string, spreadsheetID string, sheetID int32) (bool, error) {
+	query, args := table.WarehouseSheets.
+		SELECT(postgres.COUNT(postgres.STAR)).
+		WHERE(
+			table.WarehouseSheets.WarehouseID.NOT_EQ(postgres.UUID(uuid.MustParse(warehouseID))).AND(
+				table.WarehouseSheets.SpreadsheetID.EQ(postgres.String(spreadsheetID)).AND(
+					table.WarehouseSheets.SheetID.EQ(postgres.Int32(sheetID))))).
+		Sql()
+
+	var count uint64
+	err := r.pgPool.QueryRow(ctx, query, args...).Scan(&count)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 func (r *warehouse) UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.WarehouseSheets) error {

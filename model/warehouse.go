@@ -120,7 +120,18 @@ type DeleteLockerFilter struct {
 	WarehouseID string
 }
 
+type GetSyncMedicineMetadataRequest struct {
+	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	URL         string `query:"url" validate:"required,url"`
+}
+
 type SyncMedicineRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 	URL         string `json:"url" validate:"required,url"`
+}
+
+type SyncMedicineMetadata struct {
+	Title         string `json:"title"`
+	SheetName     string `json:"sheetName"`
+	TotalMedicine uint64 `json:"totalMedicine"`
 }
