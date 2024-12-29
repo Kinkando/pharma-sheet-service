@@ -76,6 +76,7 @@ type MedicineSheet struct {
 
 func (m *MedicineSheet) IsDifferent(medicineReq Medicine) bool {
 	medicine := MedicineSheet{
+		MedicineID:  medicineReq.MedicineID,
 		LockerName:  m.LockerName,
 		Floor:       medicineReq.Floor,
 		No:          medicineReq.No,
