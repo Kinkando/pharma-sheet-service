@@ -139,45 +139,54 @@ func (s *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 		return res, err
 	}
 
+	conc := pool.New().WithContext(ctx).WithMaxGoroutines(5).WithCancelOnError().WithFirstError()
 	for index, warehouse := range data {
-		lockers, err := s.lockerRepository.GetLockers(ctx, warehouse.WarehouseID)
-		if err != nil {
-			return res, err
-		}
-
-		medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: warehouse.WarehouseID})
-		if err != nil {
-			return res, err
-		}
-
-		warehouseLockers := make([]model.LockerDetail, 0, len(lockers))
-		for _, locker := range lockers {
-			var totalMedicine uint64 = 0
-			for _, medicine := range medicines {
-				if medicine.LockerID == locker.LockerID.String() {
-					totalMedicine++
-				}
-			}
-			warehouseLockers = append(warehouseLockers, model.LockerDetail{
-				LockerID:      locker.LockerID.String(),
-				LockerName:    locker.Name,
-				TotalMedicine: totalMedicine,
-			})
-		}
-		data[index].LockerDetails = warehouseLockers
-		data[index].TotalLocker = uint64(len(lockers))
-		data[index].TotalMedicine = uint64(len(medicines))
-
-		if filter.Group != model.MyWarehouse {
-			result, err := s.GetWarehouseUsers(ctx, warehouse.WarehouseID, model.FilterWarehouseUser{Pagination: model.Pagination{
-				Page:  1,
-				Limit: 9999,
-			}})
+		index, warehouse := index, warehouse
+		conc.Go(func(ctx context.Context) error {
+			lockers, err := s.lockerRepository.GetLockers(ctx, warehouse.WarehouseID)
 			if err != nil {
-				return res, err
+				return err
 			}
-			data[index].Users = result.Data
-		}
+
+			medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: warehouse.WarehouseID})
+			if err != nil {
+				return err
+			}
+
+			medicineLockerCount := make(map[string]uint64)
+			for _, medicine := range medicines {
+				medicineLockerCount[medicine.LockerID]++
+			}
+
+			warehouseLockers := make([]model.LockerDetail, 0, len(lockers))
+			for _, locker := range lockers {
+				warehouseLockers = append(warehouseLockers, model.LockerDetail{
+					LockerID:      locker.LockerID.String(),
+					LockerName:    locker.Name,
+					TotalMedicine: medicineLockerCount[locker.LockerID.String()],
+				})
+			}
+			data[index].LockerDetails = warehouseLockers
+			data[index].TotalLocker = uint64(len(lockers))
+			data[index].TotalMedicine = uint64(len(medicines))
+
+			if filter.Group != model.MyWarehouse {
+				result, err := s.GetWarehouseUsers(ctx, warehouse.WarehouseID, model.FilterWarehouseUser{
+					Pagination: model.Pagination{Page: 1, Limit: 9999},
+					Status:     genmodel.ApprovalStatus_Approved,
+				})
+				if err != nil {
+					return err
+				}
+				data[index].Users = result.Data
+			}
+
+			return nil
+		})
+	}
+	if err = conc.Wait(); err != nil {
+		logger.Context(ctx).Error(err)
+		return res, err
 	}
 
 	res = model.PaginationResponse(data, filter.Pagination, total)
