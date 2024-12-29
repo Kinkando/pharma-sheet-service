@@ -761,7 +761,7 @@ func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedici
 	}
 	if sheet == nil {
 		logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
-		return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "sheetID is not found"})
+		return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "sheetID is not found"})
 	}
 
 	isConflict, err := s.warehouseRepository.CheckConflictWarehouseSheet(ctx, req.WarehouseID, spreadsheetID, sheetID)
