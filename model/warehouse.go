@@ -112,6 +112,11 @@ type WarehouseRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 }
 
+type CountWarehouseUserStatus struct {
+	TotalApproved uint64 `json:"totalApproved"`
+	TotalPending  uint64 `json:"totalPending"`
+}
+
 type WarehouseUser struct {
 	User
 	Role   model.Role           `json:"role"`
@@ -149,4 +154,9 @@ type GoogleSheetData struct {
 	LockerID         map[string]string
 	MedicineSheets   []MedicineSheet
 	MedicineData     map[string]Medicine
+}
+
+type GetWarehouseUsersResponse struct {
+	PagingWithMetadata[WarehouseUser]
+	CountWarehouseUserStatus
 }

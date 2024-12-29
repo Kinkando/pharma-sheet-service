@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/service"
 	"github.com/labstack/echo/v4"
+	"github.com/sourcegraph/conc/pool"
 )
 
 type WarehouseHandler struct {
@@ -313,13 +315,34 @@ func (h *WarehouseHandler) getWarehouseUsers(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	data, err := h.warehouseService.GetWarehouseUsers(ctx, req.WarehouseID, req)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
+	var result model.GetWarehouseUsersResponse
+
+	conc := pool.New().WithContext(ctx).WithCancelOnError().WithFirstError()
+	conc.Go(func(ctx context.Context) error {
+		data, err := h.warehouseService.GetWarehouseUsers(ctx, req.WarehouseID, req)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return err
+		}
+		result.PagingWithMetadata = data
+		return nil
+	})
+
+	conc.Go(func(ctx context.Context) error {
+		data, err := h.warehouseService.CountWarehouseUserStatus(ctx, req.WarehouseID)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return err
+		}
+		result.CountWarehouseUserStatus = data
+		return nil
+	})
+
+	if err := conc.Wait(); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, data)
+	return c.JSON(http.StatusOK, result)
 }
 
 func (h *WarehouseHandler) joinWarehouse(c echo.Context) error {

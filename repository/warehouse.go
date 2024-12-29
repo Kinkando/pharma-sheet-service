@@ -31,6 +31,7 @@ type Warehouse interface {
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
 	DeleteWarehouse(ctx context.Context, warehouseID string) error
 
+	CountWarehouseUserStatus(ctx context.Context, warehouseID string) (model.CountWarehouseUserStatus, error)
 	GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (data []model.WarehouseUser, total uint64, err error)
 	GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (genmodel.ApprovalStatus, error)
 	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error
@@ -322,6 +323,46 @@ func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID st
 	}
 
 	return role, nil
+}
+
+func (r *warehouse) CountWarehouseUserStatus(ctx context.Context, warehouseID string) (model.CountWarehouseUserStatus, error) {
+	query, args := table.WarehouseUsers.
+		SELECT(
+			table.WarehouseUsers.UserID,
+			table.WarehouseUsers.Role,
+			table.WarehouseUsers.Status,
+		).
+		WHERE(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
+
+	var count model.CountWarehouseUserStatus
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return count, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var warehouseUser model.WarehouseUser
+		err = rows.Scan(
+			&warehouseUser.UserID,
+			&warehouseUser.Role,
+			&warehouseUser.Status,
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return count, err
+		}
+
+		switch warehouseUser.Status {
+		case genmodel.ApprovalStatus_Approved:
+			count.TotalApproved++
+		case genmodel.ApprovalStatus_Pending:
+			count.TotalPending++
+		}
+	}
+
+	return count, nil
 }
 
 func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (warehouseUsers []model.WarehouseUser, total uint64, err error) {

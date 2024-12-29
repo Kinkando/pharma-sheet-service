@@ -37,6 +37,7 @@ type Warehouse interface {
 	UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error
 	DeleteWarehouseLocker(ctx context.Context, req model.DeleteWarehouseLockerRequest) error
 
+	CountWarehouseUserStatus(ctx context.Context, warehouseID string) (model.CountWarehouseUserStatus, error)
 	GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (model.PagingWithMetadata[model.WarehouseUser], error)
 	CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error
 	UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error
@@ -379,6 +380,10 @@ func (s *warehouse) checkWarehouseManagementRole(ctx context.Context, warehouseI
 	}
 
 	return nil
+}
+
+func (s *warehouse) CountWarehouseUserStatus(ctx context.Context, warehouseID string) (model.CountWarehouseUserStatus, error) {
+	return s.warehouseRepository.CountWarehouseUserStatus(ctx, warehouseID)
 }
 
 func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (res model.PagingWithMetadata[model.WarehouseUser], err error) {
