@@ -560,59 +560,57 @@ func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseU
 }
 
 func (s *warehouse) SummarizeMedicineFromGoogleSheet(ctx context.Context, req model.GetSyncMedicineMetadataRequest) (metadata model.SyncMedicineMetadata, err error) {
-	sheet, title, _, _, err := s.getGoogleSheetData(ctx, model.SyncMedicineRequest{WarehouseID: req.WarehouseID, URL: req.URL})
+	data, err := s.getGoogleSheetData(ctx, model.SyncMedicineRequest(req), false)
 	if err != nil {
 		return
 	}
 
-	var medicineSheets []model.MedicineSheet
-	_, err = s.sheet.Read(ctx, sheet, &medicineSheets)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return metadata, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	var (
+		totalMedicine        uint64 = 0
+		totalNewMedicine     uint64 = 0
+		totalUpdatedMedicine uint64 = 0
+		totalSkippedMedicine uint64 = 0
+	)
+
+	for _, medicineSheet := range data.MedicineSheets {
+		totalMedicine++
+
+		medicine, ok := data.MedicineData[medicineSheet.Address]
+		if !ok {
+			totalNewMedicine++
+			continue
+		}
+
+		if medicineSheet.IsDifferent(medicine) {
+			totalUpdatedMedicine++
+		} else {
+			totalSkippedMedicine++
+		}
 	}
 
 	metadata = model.SyncMedicineMetadata{
-		Title:         title,
-		SheetName:     sheet.Properties.Title,
-		TotalMedicine: uint64(len(medicineSheets)),
+		Title:                data.SpreadsheetTitle,
+		SheetName:            data.Sheet.Properties.Title,
+		TotalMedicine:        totalMedicine,
+		TotalNewMedicine:     totalNewMedicine,
+		TotalUpdatedMedicine: totalUpdatedMedicine,
+		TotalSkippedMedicine: totalSkippedMedicine,
 	}
 
 	return metadata, nil
 }
 
 func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error {
-	sheet, _, spreadsheetID, sheetID, err := s.getGoogleSheetData(ctx, req)
+	data, err := s.getGoogleSheetData(ctx, req, true)
 	if err != nil {
 		return err
 	}
 
-	isConflict, err := s.warehouseRepository.CheckConflictWarehouseSheet(ctx, req.WarehouseID, spreadsheetID, sheetID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	if isConflict {
-		return echo.NewHTTPError(http.StatusConflict, echo.Map{"error": "sheet is already sync by another warehouse"})
-	}
-
-	warehouseSheet := genmodel.WarehouseSheets{
-		WarehouseID:   uuid.MustParse(req.WarehouseID),
-		SpreadsheetID: spreadsheetID,
-		SheetID:       sheetID,
-	}
-	err = s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-
-	var medicineSheets []model.MedicineSheet
-	_, err = s.sheet.Read(ctx, sheet, &medicineSheets)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
+	sheet := data.Sheet
+	spreadsheetID := data.SpreadsheetID
+	medicineSheets := data.MedicineSheets
+	medicineMapping := data.MedicineData
+	lockerID := data.LockerID
 
 	columnIDIndex := 0
 	if s.isSyncUniqueByID {
@@ -642,30 +640,6 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 				logger.Context(ctx).Error(err)
 				return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 			}
-		}
-	}
-
-	lockers, err := s.lockerRepository.GetLockers(ctx, req.WarehouseID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	lockerID := make(map[string]string)
-	for _, locker := range lockers {
-		lockerID[locker.Name] = locker.LockerID.String()
-	}
-
-	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: req.WarehouseID})
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	medicineMapping := make(map[string]model.Medicine)
-	for _, medicine := range medicines {
-		if s.isSyncUniqueByID {
-			medicineMapping[medicine.MedicineID] = medicine
-		} else {
-			medicineMapping[medicine.Address] = medicine
 		}
 	}
 
@@ -780,23 +754,23 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 	return nil
 }
 
-func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedicineRequest) (*sheets.Sheet, string, string, int32, error) {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedicineRequest, isUpdateWarehouseSheet bool) (data model.GoogleSheetData, err error) {
+	err = s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return nil, "", "", 0, err
+		return data, err
 	}
 
 	spreadsheetID, sheetID, err := extractSpreadsheetInfo(req.URL)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return nil, "", "", 0, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
+		return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
 	}
 
 	spreadsheet, err := s.sheet.Get(ctx, spreadsheetID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return nil, "", "", 0, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
+		return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
 	}
 
 	var sheet *sheets.Sheet
@@ -808,10 +782,72 @@ func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedici
 	}
 	if sheet == nil {
 		logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
-		return nil, "", "", 0, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "sheetID is not found"})
+		return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "sheetID is not found"})
 	}
 
-	return sheet, spreadsheet.Properties.Title, spreadsheetID, sheetID, nil
+	isConflict, err := s.warehouseRepository.CheckConflictWarehouseSheet(ctx, req.WarehouseID, spreadsheetID, sheetID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	if isConflict {
+		return data, echo.NewHTTPError(http.StatusConflict, echo.Map{"error": "sheet is already sync by another warehouse"})
+	}
+
+	if isUpdateWarehouseSheet {
+		warehouseSheet := genmodel.WarehouseSheets{
+			WarehouseID:   uuid.MustParse(req.WarehouseID),
+			SpreadsheetID: spreadsheetID,
+			SheetID:       sheetID,
+		}
+		err = s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+	}
+
+	var medicineSheets []model.MedicineSheet
+	_, err = s.sheet.Read(ctx, sheet, &medicineSheets)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	lockers, err := s.lockerRepository.GetLockers(ctx, req.WarehouseID)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	lockerID := make(map[string]string)
+	for _, locker := range lockers {
+		lockerID[locker.Name] = locker.LockerID.String()
+	}
+
+	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: req.WarehouseID})
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	medicineMapping := make(map[string]model.Medicine)
+	for _, medicine := range medicines {
+		if s.isSyncUniqueByID {
+			medicineMapping[medicine.MedicineID] = medicine
+		} else {
+			medicineMapping[medicine.Address] = medicine
+		}
+	}
+
+	data = model.GoogleSheetData{
+		Sheet:            sheet,
+		SpreadsheetTitle: spreadsheet.Properties.Title,
+		SpreadsheetID:    spreadsheetID,
+		LockerID:         lockerID,
+		MedicineSheets:   medicineSheets,
+		MedicineData:     medicineMapping,
+	}
+
+	return data, nil
 }
 
 func extractSpreadsheetInfo(url string) (string, int32, error) {

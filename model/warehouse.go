@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+	"google.golang.org/api/sheets/v4"
 )
 
 type Warehouse struct {
@@ -131,7 +132,19 @@ type SyncMedicineRequest struct {
 }
 
 type SyncMedicineMetadata struct {
-	Title         string `json:"title"`
-	SheetName     string `json:"sheetName"`
-	TotalMedicine uint64 `json:"totalMedicine"`
+	Title                string `json:"title"`
+	SheetName            string `json:"sheetName"`
+	TotalMedicine        uint64 `json:"totalMedicine"`
+	TotalNewMedicine     uint64 `json:"totalNewMedicine"`
+	TotalUpdatedMedicine uint64 `json:"totalUpdatedMedicine"`
+	TotalSkippedMedicine uint64 `json:"totalSkippedMedicine"`
+}
+
+type GoogleSheetData struct {
+	Sheet            *sheets.Sheet
+	SpreadsheetTitle string
+	SpreadsheetID    string
+	LockerID         map[string]string
+	MedicineSheets   []MedicineSheet
+	MedicineData     map[string]Medicine
 }
