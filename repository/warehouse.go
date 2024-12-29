@@ -155,8 +155,17 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 	}
 
 	condition := postgres.Bool(true)
-	if filter.MyWarehouse {
+	switch filter.Group {
+	case "MY_WAREHOUSE":
 		condition = condition.AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved)))
+	case "OTHER_WAREHOUSE":
+		condition = condition.AND(table.WarehouseUsers.Status.IS_NULL())
+	case "OTHER_WAREHOUSE_PENDING":
+		condition = condition.AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Pending)))
+	}
+
+	if filter.Status != "" {
+		condition = condition.AND(table.WarehouseUsers.Status.EQ(postgres.NewEnumValue(string(filter.Status))))
 	}
 
 	if filter.Search != "" {

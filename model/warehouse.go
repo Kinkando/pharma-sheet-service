@@ -7,6 +7,14 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+type WarehouseGroup string
+
+const (
+	MyWarehouse           WarehouseGroup = "MY_WAREHOUSE"
+	OtherWarehouse        WarehouseGroup = "OTHER_WAREHOUSE"
+	OtherWarehousePending WarehouseGroup = "OTHER_WAREHOUSE_PENDING"
+)
+
 type Warehouse struct {
 	WarehouseID    string     `json:"warehouseID"`
 	Name           string     `json:"warehouseName"`
@@ -23,8 +31,9 @@ type Locker struct {
 
 type FilterWarehouseDetail struct {
 	Pagination
-	Search      string `json:"-" query:"search"`
-	MyWarehouse bool   `query:"myWarehouse"`
+	Search string               `query:"search"`
+	Status model.ApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
+	Group  WarehouseGroup       `query:"group" validate:"omitempty,oneof=MY_WAREHOUSE OTHER_WAREHOUSE OTHER_WAREHOUSE_PENDING"`
 }
 
 type WarehouseDetail struct {
