@@ -43,6 +43,7 @@ type Warehouse interface {
 	UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error
 	DeleteWarehouseUser(ctx context.Context, req model.DeleteWarehouseUserRequest) error
 	JoinWarehouse(ctx context.Context, warehouseID, userID string) error
+	CancelJoinWarehouse(ctx context.Context, warehouseID, userID string) error
 	LeaveWarehouse(ctx context.Context, warehouseID, userID string) error
 	ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 	RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
@@ -503,6 +504,10 @@ func (s *warehouse) DeleteWarehouseUser(ctx context.Context, req model.DeleteWar
 
 func (s *warehouse) JoinWarehouse(ctx context.Context, warehouseID, userID string) error {
 	return s.warehouseRepository.CreateWarehouseUser(ctx, warehouseID, userID, genmodel.Role_Viewer, genmodel.ApprovalStatus_Pending)
+}
+
+func (s *warehouse) CancelJoinWarehouse(ctx context.Context, warehouseID, userID string) error {
+	return s.warehouseRepository.DeleteWarehouseUser(ctx, warehouseID, &userID)
 }
 
 func (s *warehouse) LeaveWarehouse(ctx context.Context, warehouseID, userID string) error {
