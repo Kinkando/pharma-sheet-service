@@ -587,7 +587,7 @@ func (s *warehouse) SummarizeMedicineFromGoogleSheet(ctx context.Context, req mo
 		}
 
 		locker, ok := data.LockerID[medicineSheet.LockerName]
-		if !ok || locker != medicine.LockerID || medicineSheet.IsDifferent(medicine) {
+		if !ok || locker != medicine.LockerID || medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
 			totalUpdatedMedicine++
 		} else {
 			totalSkippedMedicine++
@@ -691,7 +691,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 		}
 
 		medicine, ok := medicineMapping[key]
-		if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine) {
+		if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
 			continue
 		}
 

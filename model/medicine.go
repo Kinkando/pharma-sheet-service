@@ -74,9 +74,8 @@ type MedicineSheet struct {
 	Label       string `csv:"Label ตะกร้า" json:"label,omitempty"`
 }
 
-func (m *MedicineSheet) IsDifferent(medicineReq Medicine) bool {
+func (m *MedicineSheet) IsDifferent(medicineReq Medicine, isSyncUniqueByID bool) bool {
 	medicine := MedicineSheet{
-		MedicineID:  medicineReq.MedicineID,
 		LockerName:  m.LockerName,
 		Floor:       medicineReq.Floor,
 		No:          medicineReq.No,
@@ -84,6 +83,9 @@ func (m *MedicineSheet) IsDifferent(medicineReq Medicine) bool {
 		Description: medicineReq.Description,
 		MedicalName: medicineReq.MedicalName,
 		Label:       medicineReq.Label,
+	}
+	if isSyncUniqueByID || m.MedicineID != "" {
+		medicine.MedicineID = medicineReq.MedicineID
 	}
 	d1, _ := json.Marshal(medicine)
 	d2, _ := json.Marshal(m)
