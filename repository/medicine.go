@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -115,6 +116,10 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 	}
 	if !strings.HasSuffix(strings.ToUpper(sortBy), " ASC") && !strings.HasSuffix(strings.ToUpper(sortBy), " DESC") {
 		sortBy = strings.Split(*filter.Sort, " ")[0] + " ASC"
+	}
+	if sorts := strings.Split(sortBy, " "); sorts[0] == "address" {
+		order := sorts[1]
+		sortBy = fmt.Sprintf("lockers.name %s, floor %s, no %s", order, order, order)
 	}
 
 	query, args := medicines.
