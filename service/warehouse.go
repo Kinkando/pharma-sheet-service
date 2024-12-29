@@ -575,13 +575,19 @@ func (s *warehouse) SummarizeMedicineFromGoogleSheet(ctx context.Context, req mo
 	for _, medicineSheet := range data.MedicineSheets {
 		totalMedicine++
 
-		medicine, ok := data.MedicineData[medicineSheet.Address]
+		key := medicineSheet.Address
+		if s.isSyncUniqueByID {
+			key = medicineSheet.MedicineID
+		}
+
+		medicine, ok := data.MedicineData[key]
 		if !ok {
 			totalNewMedicine++
 			continue
 		}
 
-		if medicineSheet.IsDifferent(medicine) {
+		locker, ok := data.LockerID[medicineSheet.LockerName]
+		if !ok || locker != medicine.LockerID || medicineSheet.IsDifferent(medicine) {
 			totalUpdatedMedicine++
 		} else {
 			totalSkippedMedicine++
@@ -657,68 +663,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 			locker = lockerID[medicineSheet.LockerName]
 		}
 
-		if !s.isSyncUniqueByID {
-			medicine, ok := medicineMapping[medicineSheet.Address]
-			if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine) {
-				continue
-			}
-
-			if ok {
-				err = s.medicineRepository.UpdateMedicine(ctx, model.UpdateMedicineRequest{
-					MedicineID:  medicine.MedicineID,
-					LockerID:    locker,
-					Floor:       medicineSheet.Floor,
-					No:          medicineSheet.No,
-					Address:     medicineSheet.Address,
-					Description: medicineSheet.Description,
-					MedicalName: medicineSheet.MedicalName,
-					Label:       medicineSheet.Label,
-				})
-				if err != nil {
-					logger.Context(ctx).Error(err)
-				}
-			} else {
-				_, err = s.medicineRepository.CreateMedicine(ctx, model.CreateMedicineRequest{
-					WarehouseID: req.WarehouseID,
-					LockerID:    locker,
-					Floor:       medicineSheet.Floor,
-					No:          medicineSheet.No,
-					Address:     medicineSheet.Address,
-					Description: medicineSheet.Description,
-					MedicalName: medicineSheet.MedicalName,
-					Label:       medicineSheet.Label,
-				})
-				if err != nil {
-					logger.Context(ctx).Error(err)
-				}
-			}
-			continue
-		}
-
-		if medicineSheet.MedicineID != "" {
-			medicine, ok := medicineMapping[medicineSheet.MedicineID]
-			if ok {
-				if locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine) {
-					continue
-				}
-				err = s.medicineRepository.UpdateMedicine(ctx, model.UpdateMedicineRequest{
-					MedicineID:  medicineSheet.MedicineID,
-					LockerID:    locker,
-					Floor:       medicineSheet.Floor,
-					No:          medicineSheet.No,
-					Address:     medicineSheet.Address,
-					Description: medicineSheet.Description,
-					MedicalName: medicineSheet.MedicalName,
-					Label:       medicineSheet.Label,
-				})
-				if err != nil {
-					logger.Context(ctx).Error(err)
-				}
-				continue
-			}
-		}
-
-		req := model.CreateMedicineRequest{
+		createData := model.CreateMedicineRequest{
 			WarehouseID: req.WarehouseID,
 			LockerID:    locker,
 			Floor:       medicineSheet.Floor,
@@ -729,9 +674,43 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 			Label:       medicineSheet.Label,
 		}
 
-		medicineID, err := s.medicineRepository.CreateMedicine(ctx, req)
+		updateData := model.UpdateMedicineRequest{
+			MedicineID:  medicineSheet.MedicineID,
+			LockerID:    locker,
+			Floor:       medicineSheet.Floor,
+			No:          medicineSheet.No,
+			Address:     medicineSheet.Address,
+			Description: medicineSheet.Description,
+			MedicalName: medicineSheet.MedicalName,
+			Label:       medicineSheet.Label,
+		}
+
+		key := medicineSheet.Address
+		if s.isSyncUniqueByID {
+			key = medicineSheet.MedicineID
+		}
+
+		medicine, ok := medicineMapping[key]
+		if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine) {
+			continue
+		}
+
+		if ok {
+			updateData.MedicineID = medicine.MedicineID
+			err = s.medicineRepository.UpdateMedicine(ctx, updateData)
+			if err != nil {
+				logger.Context(ctx).Error(err)
+			}
+			continue
+		}
+
+		medicineID, err := s.medicineRepository.CreateMedicine(ctx, createData)
 		if err != nil {
 			logger.Context(ctx).Error(err)
+			continue
+		}
+
+		if !s.isSyncUniqueByID {
 			continue
 		}
 
