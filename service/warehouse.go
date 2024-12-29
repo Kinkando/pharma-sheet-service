@@ -31,7 +31,7 @@ type Warehouse interface {
 	GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (model.PagingWithMetadata[model.WarehouseDetail], error)
 	CreateWarehouse(ctx context.Context, req model.CreateWarehouseRequest) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.UpdateWarehouseRequest) error
-	DeleteWarehouse(ctx context.Context, req model.DeleteWarehouseRequest) error
+	DeleteWarehouse(ctx context.Context, warehouseID string) error
 
 	CreateWarehouseLocker(ctx context.Context, req model.CreateWarehouseLockerRequest) (string, error)
 	UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error
@@ -203,14 +203,14 @@ func (s *warehouse) UpdateWarehouse(ctx context.Context, req model.UpdateWarehou
 	return nil
 }
 
-func (s *warehouse) DeleteWarehouse(ctx context.Context, req model.DeleteWarehouseRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) error {
+	err := s.checkWarehouseManagementRole(ctx, warehouseID, genmodel.Role_Admin)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
 	}
 
-	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: req.WarehouseID})
+	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: warehouseID})
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -235,7 +235,7 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, req model.DeleteWarehou
 
 		}
 
-		rowsAffected, err := s.medicineRepository.DeleteMedicine(ctx, model.DeleteMedicineFilter{WarehouseID: req.WarehouseID})
+		rowsAffected, err := s.medicineRepository.DeleteMedicine(ctx, model.DeleteMedicineFilter{WarehouseID: warehouseID})
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": "medicine is not found"})
@@ -246,19 +246,19 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, req model.DeleteWarehou
 		}
 	}
 
-	_, err = s.lockerRepository.DeleteLocker(ctx, model.DeleteLockerFilter{WarehouseID: req.WarehouseID})
+	_, err = s.lockerRepository.DeleteLocker(ctx, model.DeleteLockerFilter{WarehouseID: warehouseID})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	err = s.warehouseRepository.DeleteWarehouseUser(ctx, req.WarehouseID, nil)
+	err = s.warehouseRepository.DeleteWarehouseUser(ctx, warehouseID, nil)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	s.warehouseRepository.DeleteWarehouseSheet(ctx, req.WarehouseID)
+	s.warehouseRepository.DeleteWarehouseSheet(ctx, warehouseID)
 
-	err = s.warehouseRepository.DeleteWarehouse(ctx, req.WarehouseID)
+	err = s.warehouseRepository.DeleteWarehouse(ctx, warehouseID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": err.Error()})

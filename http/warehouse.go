@@ -66,7 +66,7 @@ func (h *WarehouseHandler) getWarehouses(c echo.Context) error {
 func (h *WarehouseHandler) getWarehouse(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req model.GetWarehouseRequest
+	var req model.WarehouseRequest
 	if err := c.Bind(&req); err != nil {
 		logger.Context(ctx).Error(err)
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
@@ -162,7 +162,7 @@ func (h *WarehouseHandler) updateWarehouse(c echo.Context) error {
 func (h *WarehouseHandler) deleteWarehouse(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req model.DeleteWarehouseRequest
+	var req model.WarehouseRequest
 	if err := c.Bind(&req); err != nil {
 		logger.Context(ctx).Error(err)
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
@@ -173,7 +173,7 @@ func (h *WarehouseHandler) deleteWarehouse(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	err := h.warehouseService.DeleteWarehouse(ctx, req)
+	err := h.warehouseService.DeleteWarehouse(ctx, req.WarehouseID)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -324,7 +324,7 @@ func (h *WarehouseHandler) getWarehouseUsers(c echo.Context) error {
 func (h *WarehouseHandler) joinWarehouse(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req model.JoinWarehouseRequest
+	var req model.WarehouseRequest
 	if err := c.Bind(&req); err != nil {
 		logger.Context(ctx).Error(err)
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})

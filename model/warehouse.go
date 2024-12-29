@@ -62,14 +62,6 @@ type UpdateWarehouseRequest struct {
 	WarehouseName string `json:"warehouseName" validate:"required"`
 }
 
-type GetWarehouseRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
-}
-
-type DeleteWarehouseRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
-}
-
 type CreateWarehouseLockerRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 	LockerName  string `json:"lockerName" validate:"required"`
@@ -116,7 +108,7 @@ type ApprovalWarehouseUserRequest struct {
 	UserID      string `param:"userID" validate:"required,uuid"`
 }
 
-type JoinWarehouseRequest struct {
+type WarehouseRequest struct {
 	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
 }
 
