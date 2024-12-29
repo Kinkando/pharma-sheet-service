@@ -15,6 +15,7 @@ import (
 
 type User interface {
 	GetUserInfo(ctx context.Context) (model.User, error)
+	UpdateUserInfo(ctx context.Context, req model.UpdateUserRequest) error
 }
 
 type user struct {
@@ -66,4 +67,46 @@ func (s *user) GetUserInfo(ctx context.Context) (user model.User, err error) {
 	}
 
 	return user, nil
+}
+
+func (s *user) UpdateUserInfo(ctx context.Context, req model.UpdateUserRequest) (err error) {
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return
+	}
+
+	userReq := genmodel.Users{
+		UserID:      uuid.MustParse(userProfile.UserID),
+		DisplayName: req.DisplayName,
+	}
+
+	if req.ProfileImage != nil {
+		userInfo, err := s.userRepository.GetUser(ctx, genmodel.Users{UserID: uuid.MustParse(userProfile.UserID)})
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return err
+		}
+
+		if userInfo.ImageURL != nil {
+			err = s.storage.RemoveFile(ctx, *userInfo.ImageURL)
+			if err != nil {
+				logger.Context(ctx).Error(err)
+			}
+		}
+
+		imageURL, err := s.storage.UploadFile(ctx, req.ProfileImage, "profile-image")
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return err
+		}
+		userReq.ImageURL = &imageURL
+	}
+
+	err = s.userRepository.UpdateUser(ctx, userReq)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	return nil
 }

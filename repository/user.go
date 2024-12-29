@@ -94,6 +94,14 @@ func (r *user) UpdateUser(ctx context.Context, user model.Users) error {
 		columnValues = append(columnValues, postgres.String(*user.ImageURL))
 	}
 
+	if user.DisplayName != nil && *user.DisplayName != "" {
+		columnNames = append(columnNames, users.DisplayName)
+		columnValues = append(columnValues, postgres.String(*user.DisplayName))
+	} else {
+		columnNames = append(columnNames, users.DisplayName)
+		columnValues = append(columnValues, postgres.NULL)
+	}
+
 	if len(columnValues) <= 1 {
 		err := fmt.Errorf("no specific column would be updated")
 		logger.Context(ctx).Error(err)
