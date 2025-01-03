@@ -37,8 +37,8 @@ type CreateMedicineRequest struct {
 	No          int32  `form:"no" validate:"omitempty,min=1"`
 	Address     string `form:"address" validate:"required"`
 	Description string `form:"description" validate:"required"`
-	MedicalName string `form:"medicalName" validate:"required"`
-	Label       string `form:"label" validate:"required"`
+	MedicalName string `form:"medicalName"`
+	Label       string `form:"label"`
 	File        *multipart.FileHeader
 	ImageURL    *string
 }
