@@ -2,7 +2,7 @@
 CREATE TYPE approval_status AS ENUM (
   'APPROVED',
   'PENDING'
-)
+);
 
 CREATE TYPE role AS ENUM (
   'ADMIN',
