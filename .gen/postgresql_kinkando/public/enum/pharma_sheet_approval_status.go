@@ -9,7 +9,7 @@ package enum
 
 import "github.com/go-jet/jet/v2/postgres"
 
-var ApprovalStatus = &struct {
+var PharmaSheetApprovalStatus = &struct {
 	Approved postgres.StringExpression
 	Pending  postgres.StringExpression
 }{

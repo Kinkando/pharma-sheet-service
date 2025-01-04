@@ -12,17 +12,10 @@ import (
 	"time"
 )
 
-type Medicines struct {
-	MedicineID  uuid.UUID `sql:"primary_key"`
+type PharmaSheetLockers struct {
+	LockerID    uuid.UUID `sql:"primary_key"`
 	WarehouseID uuid.UUID
-	LockerID    uuid.UUID
-	Floor       int32
-	No          int32
-	Address     string
-	Description string
-	MedicalName string
-	Label       string
-	ImageURL    *string
+	Name        string
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
 }

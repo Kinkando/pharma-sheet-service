@@ -9,7 +9,7 @@ package enum
 
 import "github.com/go-jet/jet/v2/postgres"
 
-var Role = &struct {
+var PharmaSheetRole = &struct {
 	Admin  postgres.StringExpression
 	Editor postgres.StringExpression
 	Viewer postgres.StringExpression

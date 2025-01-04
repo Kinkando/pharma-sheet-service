@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-type WarehouseUsers struct {
+type PharmaSheetWarehouseUsers struct {
 	WarehouseID uuid.UUID
 	UserID      uuid.UUID
-	Role        Role
+	Role        PharmaSheetRole
+	Status      PharmaSheetApprovalStatus
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
-	Status      ApprovalStatus
 }

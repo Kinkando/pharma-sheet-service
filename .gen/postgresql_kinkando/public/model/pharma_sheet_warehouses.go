@@ -12,10 +12,9 @@ import (
 	"time"
 )
 
-type WarehouseSheets struct {
-	WarehouseID    uuid.UUID
-	SpreadsheetID  string
-	SheetID        int32
-	LatestSyncedAt time.Time
-	CreatedAt      time.Time
+type PharmaSheetWarehouses struct {
+	WarehouseID uuid.UUID `sql:"primary_key"`
+	Name        string
+	CreatedAt   time.Time
+	UpdatedAt   *time.Time
 }

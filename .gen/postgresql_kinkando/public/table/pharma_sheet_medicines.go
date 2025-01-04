@@ -11,9 +11,9 @@ import (
 	"github.com/go-jet/jet/v2/postgres"
 )
 
-var Medicines = newMedicinesTable("public", "medicines", "")
+var PharmaSheetMedicines = newPharmaSheetMedicinesTable("public", "pharma_sheet_medicines", "")
 
-type medicinesTable struct {
+type pharmaSheetMedicinesTable struct {
 	postgres.Table
 
 	// Columns
@@ -34,40 +34,40 @@ type medicinesTable struct {
 	MutableColumns postgres.ColumnList
 }
 
-type MedicinesTable struct {
-	medicinesTable
+type PharmaSheetMedicinesTable struct {
+	pharmaSheetMedicinesTable
 
-	EXCLUDED medicinesTable
+	EXCLUDED pharmaSheetMedicinesTable
 }
 
-// AS creates new MedicinesTable with assigned alias
-func (a MedicinesTable) AS(alias string) *MedicinesTable {
-	return newMedicinesTable(a.SchemaName(), a.TableName(), alias)
+// AS creates new PharmaSheetMedicinesTable with assigned alias
+func (a PharmaSheetMedicinesTable) AS(alias string) *PharmaSheetMedicinesTable {
+	return newPharmaSheetMedicinesTable(a.SchemaName(), a.TableName(), alias)
 }
 
-// Schema creates new MedicinesTable with assigned schema name
-func (a MedicinesTable) FromSchema(schemaName string) *MedicinesTable {
-	return newMedicinesTable(schemaName, a.TableName(), a.Alias())
+// Schema creates new PharmaSheetMedicinesTable with assigned schema name
+func (a PharmaSheetMedicinesTable) FromSchema(schemaName string) *PharmaSheetMedicinesTable {
+	return newPharmaSheetMedicinesTable(schemaName, a.TableName(), a.Alias())
 }
 
-// WithPrefix creates new MedicinesTable with assigned table prefix
-func (a MedicinesTable) WithPrefix(prefix string) *MedicinesTable {
-	return newMedicinesTable(a.SchemaName(), prefix+a.TableName(), a.TableName())
+// WithPrefix creates new PharmaSheetMedicinesTable with assigned table prefix
+func (a PharmaSheetMedicinesTable) WithPrefix(prefix string) *PharmaSheetMedicinesTable {
+	return newPharmaSheetMedicinesTable(a.SchemaName(), prefix+a.TableName(), a.TableName())
 }
 
-// WithSuffix creates new MedicinesTable with assigned table suffix
-func (a MedicinesTable) WithSuffix(suffix string) *MedicinesTable {
-	return newMedicinesTable(a.SchemaName(), a.TableName()+suffix, a.TableName())
+// WithSuffix creates new PharmaSheetMedicinesTable with assigned table suffix
+func (a PharmaSheetMedicinesTable) WithSuffix(suffix string) *PharmaSheetMedicinesTable {
+	return newPharmaSheetMedicinesTable(a.SchemaName(), a.TableName()+suffix, a.TableName())
 }
 
-func newMedicinesTable(schemaName, tableName, alias string) *MedicinesTable {
-	return &MedicinesTable{
-		medicinesTable: newMedicinesTableImpl(schemaName, tableName, alias),
-		EXCLUDED:       newMedicinesTableImpl("", "excluded", ""),
+func newPharmaSheetMedicinesTable(schemaName, tableName, alias string) *PharmaSheetMedicinesTable {
+	return &PharmaSheetMedicinesTable{
+		pharmaSheetMedicinesTable: newPharmaSheetMedicinesTableImpl(schemaName, tableName, alias),
+		EXCLUDED:                  newPharmaSheetMedicinesTableImpl("", "excluded", ""),
 	}
 }
 
-func newMedicinesTableImpl(schemaName, tableName, alias string) medicinesTable {
+func newPharmaSheetMedicinesTableImpl(schemaName, tableName, alias string) pharmaSheetMedicinesTable {
 	var (
 		MedicineIDColumn  = postgres.StringColumn("medicine_id")
 		WarehouseIDColumn = postgres.StringColumn("warehouse_id")
@@ -85,7 +85,7 @@ func newMedicinesTableImpl(schemaName, tableName, alias string) medicinesTable {
 		mutableColumns    = postgres.ColumnList{WarehouseIDColumn, LockerIDColumn, FloorColumn, NoColumn, AddressColumn, DescriptionColumn, MedicalNameColumn, LabelColumn, ImageURLColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
-	return medicinesTable{
+	return pharmaSheetMedicinesTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns

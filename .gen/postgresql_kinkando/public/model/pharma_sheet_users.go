@@ -12,12 +12,12 @@ import (
 	"time"
 )
 
-type Users struct {
+type PharmaSheetUsers struct {
 	UserID      uuid.UUID `sql:"primary_key"`
 	FirebaseUID *string
 	Email       string
-	CreatedAt   time.Time
-	UpdatedAt   *time.Time
 	DisplayName *string
 	ImageURL    *string
+	CreatedAt   time.Time
+	UpdatedAt   *time.Time
 }
