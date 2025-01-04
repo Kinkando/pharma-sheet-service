@@ -5,7 +5,7 @@ import (
 
 	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
-	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+	genmodel "github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
@@ -42,7 +42,7 @@ func (s *user) GetUserInfo(ctx context.Context) (user model.User, err error) {
 		return
 	}
 
-	userInfo, err := s.userRepository.GetUser(ctx, genmodel.Users{UserID: uuid.MustParse(userProfile.UserID)})
+	userInfo, err := s.userRepository.GetUser(ctx, genmodel.PharmaSheetUsers{UserID: uuid.MustParse(userProfile.UserID)})
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return
@@ -75,13 +75,13 @@ func (s *user) UpdateUserInfo(ctx context.Context, req model.UpdateUserRequest) 
 		return
 	}
 
-	userReq := genmodel.Users{
+	userReq := genmodel.PharmaSheetUsers{
 		UserID:      uuid.MustParse(userProfile.UserID),
 		DisplayName: req.DisplayName,
 	}
 
 	if req.ProfileImage != nil {
-		userInfo, err := s.userRepository.GetUser(ctx, genmodel.Users{UserID: uuid.MustParse(userProfile.UserID)})
+		userInfo, err := s.userRepository.GetUser(ctx, genmodel.PharmaSheetUsers{UserID: uuid.MustParse(userProfile.UserID)})
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return err

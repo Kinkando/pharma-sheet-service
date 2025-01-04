@@ -10,16 +10,16 @@ import (
 	"github.com/go-jet/jet/v2/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
-	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/table"
+	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
+	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/table"
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 )
 
 type User interface {
-	GetUser(ctx context.Context, user model.Users) (model.Users, error)
-	CreateUser(ctx context.Context, user model.Users) (string, error)
-	UpdateUser(ctx context.Context, user model.Users) error
+	GetUser(ctx context.Context, user model.PharmaSheetUsers) (model.PharmaSheetUsers, error)
+	CreateUser(ctx context.Context, user model.PharmaSheetUsers) (string, error)
+	UpdateUser(ctx context.Context, user model.PharmaSheetUsers) error
 }
 
 type user struct {
@@ -32,8 +32,8 @@ func NewUserRepository(pgPool *pgxpool.Pool) User {
 	}
 }
 
-func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.Users, err error) {
-	users := table.Users
+func (r *user) GetUser(ctx context.Context, filter model.PharmaSheetUsers) (user model.PharmaSheetUsers, err error) {
+	users := table.PharmaSheetUsers
 
 	var conditions []postgres.BoolExpression
 	if filter.UserID != uuid.Nil {
@@ -62,8 +62,8 @@ func (r *user) GetUser(ctx context.Context, filter model.Users) (user model.User
 	return user, nil
 }
 
-func (r *user) CreateUser(ctx context.Context, user model.Users) (string, error) {
-	users := table.Users
+func (r *user) CreateUser(ctx context.Context, user model.PharmaSheetUsers) (string, error) {
+	users := table.PharmaSheetUsers
 
 	user.UserID = uuid.MustParse(generator.UUID())
 	user.CreatedAt = time.Now()
@@ -78,8 +78,8 @@ func (r *user) CreateUser(ctx context.Context, user model.Users) (string, error)
 	return user.UserID.String(), nil
 }
 
-func (r *user) UpdateUser(ctx context.Context, user model.Users) error {
-	users := table.Users
+func (r *user) UpdateUser(ctx context.Context, user model.PharmaSheetUsers) error {
+	users := table.PharmaSheetUsers
 
 	columnNames := postgres.ColumnList{users.UpdatedAt}
 	columnValues := []any{postgres.TimestampzT(time.Now())}

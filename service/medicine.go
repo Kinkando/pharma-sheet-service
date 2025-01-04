@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"slices"
 
-	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+	genmodel "github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
@@ -84,7 +84,7 @@ func (s *medicine) GetMedicine(ctx context.Context, medicineID string) (model.Me
 }
 
 func (s *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (string, error) {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, idTypeWarehouse, genmodel.Role_Admin, genmodel.Role_Editor)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, idTypeWarehouse, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return "", err
@@ -115,7 +115,7 @@ func (s *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineR
 }
 
 func (s *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.MedicineID, idTypeMedicine, genmodel.Role_Admin, genmodel.Role_Editor)
+	err := s.checkWarehouseManagementRole(ctx, req.MedicineID, idTypeMedicine, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -166,7 +166,7 @@ func (s *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 }
 
 func (s *medicine) DeleteMedicine(ctx context.Context, medicineID string) error {
-	err := s.checkWarehouseManagementRole(ctx, medicineID, idTypeMedicine, genmodel.Role_Admin, genmodel.Role_Editor)
+	err := s.checkWarehouseManagementRole(ctx, medicineID, idTypeMedicine, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -198,13 +198,13 @@ func (s *medicine) DeleteMedicine(ctx context.Context, medicineID string) error 
 	return nil
 }
 
-func (s *medicine) checkWarehouseManagementRole(ctx context.Context, id string, idType string, roles ...genmodel.Role) (err error) {
+func (s *medicine) checkWarehouseManagementRole(ctx context.Context, id string, idType string, roles ...genmodel.PharmaSheetRole) (err error) {
 	userProfile, err := profile.UseProfile(ctx)
 	if err != nil {
 		return
 	}
 
-	var role genmodel.Role
+	var role genmodel.PharmaSheetRole
 	switch idType {
 	case idTypeMedicine:
 		role, err = s.medicineRepository.GetMedicineRole(ctx, id, userProfile.UserID)

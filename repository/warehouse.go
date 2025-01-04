@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/enum"
-	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
-	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/table"
+	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/enum"
+	genmodel "github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
+	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/table"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/database/postgresql"
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
@@ -26,20 +26,20 @@ type Warehouse interface {
 	GetWarehouse(ctx context.Context, warehouseID string) (model.Warehouse, error)
 	GetWarehouses(ctx context.Context) ([]model.Warehouse, error)
 	GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (data []model.WarehouseDetail, total uint64, err error)
-	GetWarehouseRole(ctx context.Context, warehouseID, userID string) (genmodel.Role, error)
+	GetWarehouseRole(ctx context.Context, warehouseID, userID string) (genmodel.PharmaSheetRole, error)
 	CreateWarehouse(ctx context.Context, req model.Warehouse) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.Warehouse) error
 	DeleteWarehouse(ctx context.Context, warehouseID string) error
 
 	CountWarehouseUserStatus(ctx context.Context, warehouseID string) (model.CountWarehouseUserStatus, error)
 	GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (data []model.WarehouseUser, total uint64, err error)
-	GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (genmodel.ApprovalStatus, error)
-	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error
-	UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error
+	GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (genmodel.PharmaSheetApprovalStatus, error)
+	CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.PharmaSheetRole, status genmodel.PharmaSheetApprovalStatus) error
+	UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.PharmaSheetWarehouseUsers) error
 	DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error
 
 	CheckConflictWarehouseSheet(ctx context.Context, warehouseID string, spreadsheetID string, sheetID int32) (bool, error)
-	UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.WarehouseSheets) error
+	UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.PharmaSheetWarehouseSheets) error
 	DeleteWarehouseSheet(ctx context.Context, warehouseID string) error
 }
 
@@ -52,18 +52,18 @@ func NewWarehouseRepository(pgPool *pgxpool.Pool) Warehouse {
 }
 
 func (r *warehouse) GetWarehouse(ctx context.Context, warehouseID string) (model.Warehouse, error) {
-	query, args := table.Warehouses.
-		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
-		LEFT_JOIN(table.WarehouseSheets, table.Warehouses.WarehouseID.EQ(table.WarehouseSheets.WarehouseID)).
+	query, args := table.PharmaSheetWarehouses.
+		INNER_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetWarehouseUsers.WarehouseID)).
+		LEFT_JOIN(table.PharmaSheetWarehouseSheets, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetWarehouseSheets.WarehouseID)).
 		SELECT(
-			table.Warehouses.WarehouseID,
-			table.Warehouses.Name,
-			table.WarehouseUsers.Role,
-			table.WarehouseSheets.SpreadsheetID,
-			table.WarehouseSheets.SheetID,
-			table.WarehouseSheets.LatestSyncedAt,
+			table.PharmaSheetWarehouses.WarehouseID,
+			table.PharmaSheetWarehouses.Name,
+			table.PharmaSheetWarehouseUsers.Role,
+			table.PharmaSheetWarehouseSheets.SpreadsheetID,
+			table.PharmaSheetWarehouseSheets.SheetID,
+			table.PharmaSheetWarehouseSheets.LatestSyncedAt,
 		).
-		WHERE(table.Warehouses.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
+		WHERE(table.PharmaSheetWarehouses.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).
 		Sql()
 
 	var warehouse model.Warehouse
@@ -99,19 +99,19 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 		return nil, err
 	}
 
-	query, args := table.Warehouses.
-		INNER_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID)).
-		LEFT_JOIN(table.WarehouseSheets, table.Warehouses.WarehouseID.EQ(table.WarehouseSheets.WarehouseID)).
+	query, args := table.PharmaSheetWarehouses.
+		INNER_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetWarehouseUsers.WarehouseID)).
+		LEFT_JOIN(table.PharmaSheetWarehouseSheets, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetWarehouseSheets.WarehouseID)).
 		SELECT(
-			table.Warehouses.WarehouseID,
-			table.Warehouses.Name,
-			table.WarehouseUsers.Role,
-			table.WarehouseSheets.SpreadsheetID,
-			table.WarehouseSheets.SheetID,
-			table.WarehouseSheets.LatestSyncedAt,
+			table.PharmaSheetWarehouses.WarehouseID,
+			table.PharmaSheetWarehouses.Name,
+			table.PharmaSheetWarehouseUsers.Role,
+			table.PharmaSheetWarehouseSheets.SpreadsheetID,
+			table.PharmaSheetWarehouseSheets.SheetID,
+			table.PharmaSheetWarehouseSheets.LatestSyncedAt,
 		).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))).
-		ORDER_BY(table.Warehouses.Name.ASC()).
+		WHERE(table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved))).
+		ORDER_BY(table.PharmaSheetWarehouses.Name.ASC()).
 		Sql()
 
 	rows, err := r.pgPool.Query(ctx, query, args...)
@@ -158,25 +158,25 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 	condition := postgres.Bool(true)
 	switch filter.Group {
 	case "MY_WAREHOUSE":
-		condition = condition.AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved)))
+		condition = condition.AND(table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved)))
 	case "OTHER_WAREHOUSE":
-		condition = condition.AND(table.WarehouseUsers.Status.IS_NULL())
+		condition = condition.AND(table.PharmaSheetWarehouseUsers.Status.IS_NULL())
 	case "OTHER_WAREHOUSE_PENDING":
-		condition = condition.AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Pending)))
+		condition = condition.AND(table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Pending)))
 	}
 
 	if filter.Status != "" {
-		condition = condition.AND(table.WarehouseUsers.Status.EQ(postgres.NewEnumValue(string(filter.Status))))
+		condition = condition.AND(table.PharmaSheetWarehouseUsers.Status.EQ(postgres.NewEnumValue(string(filter.Status))))
 	}
 
 	if filter.Search != "" {
 		search := postgres.String("%" + strings.ToLower(filter.Search) + "%")
-		condition = condition.AND(postgres.LOWER(table.Warehouses.Name).LIKE(search))
+		condition = condition.AND(postgres.LOWER(table.PharmaSheetWarehouses.Name).LIKE(search))
 	}
 
-	query, args := table.Warehouses.
-		LEFT_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID).AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))))).
-		SELECT(postgres.COUNT(table.Warehouses.WarehouseID)).
+	query, args := table.PharmaSheetWarehouses.
+		LEFT_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetWarehouseUsers.WarehouseID).AND(table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))))).
+		SELECT(postgres.COUNT(table.PharmaSheetWarehouses.WarehouseID)).
 		WHERE(condition).
 		Sql()
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&total)
@@ -189,13 +189,13 @@ func (r *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 		return
 	}
 
-	query, args = table.Warehouses.
-		LEFT_JOIN(table.WarehouseUsers, table.Warehouses.WarehouseID.EQ(table.WarehouseUsers.WarehouseID).AND(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))))).
-		SELECT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.WarehouseUsers.Role, table.WarehouseUsers.Status).
+	query, args = table.PharmaSheetWarehouses.
+		LEFT_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetWarehouseUsers.WarehouseID).AND(table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))))).
+		SELECT(table.PharmaSheetWarehouses.WarehouseID, table.PharmaSheetWarehouses.Name, table.PharmaSheetWarehouseUsers.Role, table.PharmaSheetWarehouseUsers.Status).
 		WHERE(condition).
 		LIMIT(int64(filter.Limit)).
 		OFFSET(int64(filter.Offset)).
-		ORDER_BY(table.Warehouses.Name.ASC()).
+		ORDER_BY(table.PharmaSheetWarehouses.Name.ASC()).
 		Sql()
 
 	rows, err := r.pgPool.Query(ctx, query, args...)
@@ -226,22 +226,22 @@ func (r *warehouse) CreateWarehouse(ctx context.Context, req model.Warehouse) (w
 
 	warehouseID = generator.UUID()
 	err = postgresql.Commit(ctx, r.pgPool, func(ctx context.Context, tx pgx.Tx) error {
-		warehouseData := genmodel.Warehouses{
+		warehouseData := genmodel.PharmaSheetWarehouses{
 			WarehouseID: uuid.MustParse(warehouseID),
 			Name:        req.Name,
 			CreatedAt:   time.Now(),
 		}
 
-		warehouseUserData := genmodel.WarehouseUsers{
+		warehouseUserData := genmodel.PharmaSheetWarehouseUsers{
 			WarehouseID: uuid.MustParse(warehouseID),
-			Role:        genmodel.Role_Admin,
+			Role:        genmodel.PharmaSheetRole_Admin,
 			UserID:      uuid.MustParse(userProfile.UserID),
-			Status:      genmodel.ApprovalStatus_Approved,
+			Status:      genmodel.PharmaSheetApprovalStatus_Approved,
 			CreatedAt:   time.Now(),
 		}
 
-		sql, args := table.Warehouses.
-			INSERT(table.Warehouses.WarehouseID, table.Warehouses.Name, table.Warehouses.CreatedAt).
+		sql, args := table.PharmaSheetWarehouses.
+			INSERT(table.PharmaSheetWarehouses.WarehouseID, table.PharmaSheetWarehouses.Name, table.PharmaSheetWarehouses.CreatedAt).
 			MODEL(warehouseData).
 			Sql()
 		_, err = tx.Exec(ctx, sql, args...)
@@ -250,8 +250,8 @@ func (r *warehouse) CreateWarehouse(ctx context.Context, req model.Warehouse) (w
 			return err
 		}
 
-		sql, args = table.WarehouseUsers.
-			INSERT(table.WarehouseUsers.WarehouseID, table.WarehouseUsers.UserID, table.WarehouseUsers.Role, table.WarehouseUsers.Status, table.Warehouses.CreatedAt).
+		sql, args = table.PharmaSheetWarehouseUsers.
+			INSERT(table.PharmaSheetWarehouseUsers.WarehouseID, table.PharmaSheetWarehouseUsers.UserID, table.PharmaSheetWarehouseUsers.Role, table.PharmaSheetWarehouseUsers.Status, table.PharmaSheetWarehouses.CreatedAt).
 			MODEL(warehouseUserData).
 			Sql()
 		_, err = tx.Exec(ctx, sql, args...)
@@ -270,10 +270,10 @@ func (r *warehouse) CreateWarehouse(ctx context.Context, req model.Warehouse) (w
 }
 
 func (r *warehouse) UpdateWarehouse(ctx context.Context, req model.Warehouse) error {
-	warehouses := table.Warehouses
+	warehouses := table.PharmaSheetWarehouses
 
 	now := time.Now()
-	warehouse := genmodel.Warehouses{
+	warehouse := genmodel.PharmaSheetWarehouses{
 		WarehouseID: uuid.MustParse(req.WarehouseID),
 		Name:        req.Name,
 		UpdatedAt:   &now,
@@ -294,7 +294,7 @@ func (r *warehouse) UpdateWarehouse(ctx context.Context, req model.Warehouse) er
 }
 
 func (r *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) error {
-	stmt, args := table.Warehouses.DELETE().WHERE(table.Warehouses.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
+	stmt, args := table.PharmaSheetWarehouses.DELETE().WHERE(table.PharmaSheetWarehouses.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -306,13 +306,13 @@ func (r *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string) err
 	return nil
 }
 
-func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID string) (role genmodel.Role, err error) {
-	query, args := table.WarehouseUsers.
-		SELECT(table.WarehouseUsers.Role).
+func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID string) (role genmodel.PharmaSheetRole, err error) {
+	query, args := table.PharmaSheetWarehouseUsers.
+		SELECT(table.PharmaSheetWarehouseUsers.Role).
 		WHERE(
-			table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(
-				table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved)).AND(
-				table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))),
+			table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(
+				table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved)).AND(
+				table.PharmaSheetWarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))),
 		).
 		Sql()
 
@@ -326,13 +326,13 @@ func (r *warehouse) GetWarehouseRole(ctx context.Context, warehouseID, userID st
 }
 
 func (r *warehouse) CountWarehouseUserStatus(ctx context.Context, warehouseID string) (model.CountWarehouseUserStatus, error) {
-	query, args := table.WarehouseUsers.
+	query, args := table.PharmaSheetWarehouseUsers.
 		SELECT(
-			table.WarehouseUsers.UserID,
-			table.WarehouseUsers.Role,
-			table.WarehouseUsers.Status,
+			table.PharmaSheetWarehouseUsers.UserID,
+			table.PharmaSheetWarehouseUsers.Role,
+			table.PharmaSheetWarehouseUsers.Status,
 		).
-		WHERE(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
+		WHERE(table.PharmaSheetWarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
 
 	var count model.CountWarehouseUserStatus
 	rows, err := r.pgPool.Query(ctx, query, args...)
@@ -355,9 +355,9 @@ func (r *warehouse) CountWarehouseUserStatus(ctx context.Context, warehouseID st
 		}
 
 		switch warehouseUser.Status {
-		case genmodel.ApprovalStatus_Approved:
+		case genmodel.PharmaSheetApprovalStatus_Approved:
 			count.TotalApproved++
-		case genmodel.ApprovalStatus_Pending:
+		case genmodel.PharmaSheetApprovalStatus_Pending:
 			count.TotalPending++
 		}
 	}
@@ -366,26 +366,26 @@ func (r *warehouse) CountWarehouseUserStatus(ctx context.Context, warehouseID st
 }
 
 func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (warehouseUsers []model.WarehouseUser, total uint64, err error) {
-	condition := table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))
+	condition := table.PharmaSheetWarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))
 
 	if filter.Role != "" {
-		condition = condition.AND(table.WarehouseUsers.Role.EQ(postgres.NewEnumValue(string(filter.Role))))
+		condition = condition.AND(table.PharmaSheetWarehouseUsers.Role.EQ(postgres.NewEnumValue(string(filter.Role))))
 	}
 	if filter.Status != "" {
-		condition = condition.AND(table.WarehouseUsers.Status.EQ(postgres.NewEnumValue(string(filter.Status))))
+		condition = condition.AND(table.PharmaSheetWarehouseUsers.Status.EQ(postgres.NewEnumValue(string(filter.Status))))
 	}
 	if strings.TrimSpace(filter.Search) != "" {
 		search := postgres.String("%" + strings.ToLower(filter.Search) + "%")
 		condition = condition.AND(
 			postgres.OR(
-				postgres.LOWER(table.Users.DisplayName).LIKE(search),
-				postgres.LOWER(table.Users.Email).LIKE(search),
+				postgres.LOWER(table.PharmaSheetUsers.DisplayName).LIKE(search),
+				postgres.LOWER(table.PharmaSheetUsers.Email).LIKE(search),
 			),
 		)
 	}
 
-	query, args := table.WarehouseUsers.
-		INNER_JOIN(table.Users, table.WarehouseUsers.UserID.EQ(table.Users.UserID)).
+	query, args := table.PharmaSheetWarehouseUsers.
+		INNER_JOIN(table.PharmaSheetUsers, table.PharmaSheetWarehouseUsers.UserID.EQ(table.PharmaSheetUsers.UserID)).
 		SELECT(postgres.COUNT(postgres.STAR)).
 		WHERE(condition).
 		Sql()
@@ -399,21 +399,21 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, f
 		return
 	}
 
-	query, args = table.WarehouseUsers.
-		INNER_JOIN(table.Users, table.WarehouseUsers.UserID.EQ(table.Users.UserID)).
+	query, args = table.PharmaSheetWarehouseUsers.
+		INNER_JOIN(table.PharmaSheetUsers, table.PharmaSheetWarehouseUsers.UserID.EQ(table.PharmaSheetUsers.UserID)).
 		SELECT(
-			table.WarehouseUsers.UserID,
-			table.WarehouseUsers.Role,
-			table.Users.FirebaseUID,
-			table.Users.Email,
-			table.Users.DisplayName,
-			table.Users.ImageURL,
-			table.WarehouseUsers.Status,
+			table.PharmaSheetWarehouseUsers.UserID,
+			table.PharmaSheetWarehouseUsers.Role,
+			table.PharmaSheetUsers.FirebaseUID,
+			table.PharmaSheetUsers.Email,
+			table.PharmaSheetUsers.DisplayName,
+			table.PharmaSheetUsers.ImageURL,
+			table.PharmaSheetWarehouseUsers.Status,
 		).
 		WHERE(condition).
 		LIMIT(int64(filter.Limit)).
 		OFFSET(int64(filter.Offset)).
-		ORDER_BY(table.Users.Email.ASC()).
+		ORDER_BY(table.PharmaSheetUsers.Email.ASC()).
 		Sql()
 
 	rows, err := r.pgPool.Query(ctx, query, args...)
@@ -444,10 +444,10 @@ func (r *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, f
 	return warehouseUsers, total, nil
 }
 
-func (r *warehouse) GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (status genmodel.ApprovalStatus, err error) {
-	query, args := table.WarehouseUsers.
-		SELECT(table.WarehouseUsers.Status).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.WarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID))))).
+func (r *warehouse) GetWarehouseUserStatus(ctx context.Context, warehouseID, userID string) (status genmodel.PharmaSheetApprovalStatus, err error) {
+	query, args := table.PharmaSheetWarehouseUsers.
+		SELECT(table.PharmaSheetWarehouseUsers.Status).
+		WHERE(table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.PharmaSheetWarehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID))))).
 		Sql()
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&status)
@@ -459,10 +459,10 @@ func (r *warehouse) GetWarehouseUserStatus(ctx context.Context, warehouseID, use
 	return status, nil
 }
 
-func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.Role, status genmodel.ApprovalStatus) error {
-	warehouseUsers := table.WarehouseUsers
+func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID string, role genmodel.PharmaSheetRole, status genmodel.PharmaSheetApprovalStatus) error {
+	warehouseUsers := table.PharmaSheetWarehouseUsers
 
-	warehouse := genmodel.WarehouseUsers{
+	warehouse := genmodel.PharmaSheetWarehouseUsers{
 		WarehouseID: uuid.MustParse(warehouseID),
 		UserID:      uuid.MustParse(userID),
 		Role:        role,
@@ -483,8 +483,8 @@ func (r *warehouse) CreateWarehouseUser(ctx context.Context, warehouseID, userID
 	return nil
 }
 
-func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.WarehouseUsers) error {
-	warehouseUsers := table.WarehouseUsers
+func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseUser genmodel.PharmaSheetWarehouseUsers) error {
+	warehouseUsers := table.PharmaSheetWarehouseUsers
 
 	if warehouseUser.Role == "" && warehouseUser.Status == "" {
 		return errors.New("no specific column is update")
@@ -521,12 +521,12 @@ func (r *warehouse) UpdateWarehouseUser(ctx context.Context, warehouseUser genmo
 }
 
 func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID string, userID *string) error {
-	warehouseUsers := table.WarehouseUsers
+	warehouseUsers := table.PharmaSheetWarehouseUsers
 	condition := warehouseUsers.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))
 	if userID != nil {
 		condition = condition.AND(warehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(*userID))))
 	}
-	stmt, args := table.WarehouseUsers.DELETE().WHERE(condition).Sql()
+	stmt, args := table.PharmaSheetWarehouseUsers.DELETE().WHERE(condition).Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -541,12 +541,12 @@ func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID string,
 }
 
 func (r *warehouse) CheckConflictWarehouseSheet(ctx context.Context, warehouseID string, spreadsheetID string, sheetID int32) (bool, error) {
-	query, args := table.WarehouseSheets.
+	query, args := table.PharmaSheetWarehouseSheets.
 		SELECT(postgres.COUNT(postgres.STAR)).
 		WHERE(
-			table.WarehouseSheets.WarehouseID.NOT_EQ(postgres.UUID(uuid.MustParse(warehouseID))).AND(
-				table.WarehouseSheets.SpreadsheetID.EQ(postgres.String(spreadsheetID)).AND(
-					table.WarehouseSheets.SheetID.EQ(postgres.Int32(sheetID))))).
+			table.PharmaSheetWarehouseSheets.WarehouseID.NOT_EQ(postgres.UUID(uuid.MustParse(warehouseID))).AND(
+				table.PharmaSheetWarehouseSheets.SpreadsheetID.EQ(postgres.String(spreadsheetID)).AND(
+					table.PharmaSheetWarehouseSheets.SheetID.EQ(postgres.Int32(sheetID))))).
 		Sql()
 
 	var count uint64
@@ -559,18 +559,18 @@ func (r *warehouse) CheckConflictWarehouseSheet(ctx context.Context, warehouseID
 	return count > 0, nil
 }
 
-func (r *warehouse) UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.WarehouseSheets) error {
+func (r *warehouse) UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.PharmaSheetWarehouseSheets) error {
 	warehouseSheet.LatestSyncedAt = time.Now()
 	warehouseSheet.CreatedAt = time.Now()
 
-	stmt, args := table.WarehouseSheets.
-		INSERT(table.WarehouseSheets.WarehouseID, table.WarehouseSheets.SpreadsheetID, table.WarehouseSheets.SheetID, table.WarehouseSheets.LatestSyncedAt, table.WarehouseSheets.CreatedAt).
+	stmt, args := table.PharmaSheetWarehouseSheets.
+		INSERT(table.PharmaSheetWarehouseSheets.WarehouseID, table.PharmaSheetWarehouseSheets.SpreadsheetID, table.PharmaSheetWarehouseSheets.SheetID, table.PharmaSheetWarehouseSheets.LatestSyncedAt, table.PharmaSheetWarehouseSheets.CreatedAt).
 		MODEL(warehouseSheet).
-		ON_CONFLICT(table.WarehouseSheets.WarehouseID).
+		ON_CONFLICT(table.PharmaSheetWarehouseSheets.WarehouseID).
 		DO_UPDATE(postgres.SET(
-			table.WarehouseSheets.SpreadsheetID.SET(postgres.String(warehouseSheet.SpreadsheetID)),
-			table.WarehouseSheets.SheetID.SET(postgres.Int32(warehouseSheet.SheetID)),
-			table.WarehouseSheets.LatestSyncedAt.SET(postgres.TimestampzT(time.Now())),
+			table.PharmaSheetWarehouseSheets.SpreadsheetID.SET(postgres.String(warehouseSheet.SpreadsheetID)),
+			table.PharmaSheetWarehouseSheets.SheetID.SET(postgres.Int32(warehouseSheet.SheetID)),
+			table.PharmaSheetWarehouseSheets.LatestSyncedAt.SET(postgres.TimestampzT(time.Now())),
 		)).
 		Sql()
 	_, err := r.pgPool.Exec(ctx, stmt, args...)
@@ -583,7 +583,7 @@ func (r *warehouse) UpsertWarehouseSheet(ctx context.Context, warehouseSheet gen
 }
 
 func (r *warehouse) DeleteWarehouseSheet(ctx context.Context, warehouseID string) error {
-	stmt, args := table.WarehouseSheets.DELETE().WHERE(table.WarehouseSheets.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
+	stmt, args := table.PharmaSheetWarehouseSheets.DELETE().WHERE(table.PharmaSheetWarehouseSheets.WarehouseID.EQ(postgres.UUID(uuid.MustParse(warehouseID)))).Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)

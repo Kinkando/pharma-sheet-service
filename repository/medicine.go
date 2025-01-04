@@ -10,9 +10,9 @@ import (
 	"github.com/go-jet/jet/v2/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/enum"
-	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
-	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/table"
+	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/enum"
+	genmodel "github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
+	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/table"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
@@ -20,7 +20,7 @@ import (
 )
 
 type Medicine interface {
-	GetMedicineRole(ctx context.Context, medicineID, userID string) (genmodel.Role, error)
+	GetMedicineRole(ctx context.Context, medicineID, userID string) (genmodel.PharmaSheetRole, error)
 	GetMedicine(ctx context.Context, medicineID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error)
 	ListMedicines(ctx context.Context, filter model.ListMedicine) ([]model.Medicine, error)
@@ -38,11 +38,11 @@ func NewMedicineRepository(pgPool *pgxpool.Pool) Medicine {
 	return &medicine{pgPool: pgPool}
 }
 
-func (r *medicine) GetMedicineRole(ctx context.Context, medicineID, userID string) (role genmodel.Role, err error) {
-	query, args := table.WarehouseUsers.
-		INNER_JOIN(table.Medicines, table.WarehouseUsers.WarehouseID.EQ(table.Medicines.WarehouseID)).
-		SELECT(table.WarehouseUsers.Role).
-		WHERE(table.WarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.WarehouseUsers.Status.EQ(enum.ApprovalStatus.Approved))).
+func (r *medicine) GetMedicineRole(ctx context.Context, medicineID, userID string) (role genmodel.PharmaSheetRole, err error) {
+	query, args := table.PharmaSheetWarehouseUsers.
+		INNER_JOIN(table.PharmaSheetMedicines, table.PharmaSheetWarehouseUsers.WarehouseID.EQ(table.PharmaSheetMedicines.WarehouseID)).
+		SELECT(table.PharmaSheetWarehouseUsers.Role).
+		WHERE(table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved))).
 		Sql()
 
 	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&role)
@@ -55,14 +55,14 @@ func (r *medicine) GetMedicineRole(ctx context.Context, medicineID, userID strin
 }
 
 func (r *medicine) GetMedicine(ctx context.Context, medicineID string) (medicine model.Medicine, err error) {
-	medicines := table.Medicines
+	medicines := table.PharmaSheetMedicines
 	query, args := medicines.
-		LEFT_JOIN(table.Lockers, medicines.LockerID.EQ(table.Lockers.LockerID)).
+		LEFT_JOIN(table.PharmaSheetLockers, medicines.LockerID.EQ(table.PharmaSheetLockers.LockerID)).
 		SELECT(
 			medicines.MedicineID,
 			medicines.WarehouseID,
 			medicines.LockerID,
-			table.Lockers.Name,
+			table.PharmaSheetLockers.Name,
 			medicines.Floor,
 			medicines.No,
 			medicines.Address,
@@ -96,7 +96,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicineID string) (medicine
 }
 
 func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error) {
-	medicines := table.Medicines
+	medicines := table.PharmaSheetMedicines
 	condition := medicines.WarehouseID.EQ(postgres.UUID(uuid.MustParse(filter.WarehouseID)))
 
 	if filter.Search != "" {
@@ -137,12 +137,12 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 	}
 
 	query, args = medicines.
-		LEFT_JOIN(table.Lockers, medicines.LockerID.EQ(table.Lockers.LockerID)).
+		LEFT_JOIN(table.PharmaSheetLockers, medicines.LockerID.EQ(table.PharmaSheetLockers.LockerID)).
 		SELECT(
 			medicines.MedicineID,
 			medicines.WarehouseID,
 			medicines.LockerID,
-			table.Lockers.Name,
+			table.PharmaSheetLockers.Name,
 			medicines.Floor,
 			medicines.No,
 			medicines.Address,
@@ -190,7 +190,7 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 }
 
 func (r *medicine) ListMedicines(ctx context.Context, filter model.ListMedicine) (data []model.Medicine, err error) {
-	medicines := table.Medicines
+	medicines := table.PharmaSheetMedicines
 
 	var condition postgres.BoolExpression
 	if filter.LockerID != "" {
@@ -249,9 +249,9 @@ func (r *medicine) ListMedicines(ctx context.Context, filter model.ListMedicine)
 }
 
 func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicineID string, err error) {
-	medicines := table.Medicines
+	medicines := table.PharmaSheetMedicines
 
-	medicine := genmodel.Medicines{
+	medicine := genmodel.PharmaSheetMedicines{
 		MedicineID:  uuid.MustParse(generator.UUID()),
 		WarehouseID: uuid.MustParse(req.WarehouseID),
 		LockerID:    uuid.MustParse(req.LockerID),
@@ -291,7 +291,7 @@ func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineR
 }
 
 func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error {
-	medicines := table.Medicines
+	medicines := table.PharmaSheetMedicines
 
 	columnNames := postgres.ColumnList{
 		medicines.LockerID,
@@ -337,14 +337,14 @@ func (r *medicine) UpdateMedicine(ctx context.Context, req model.UpdateMedicineR
 }
 
 func (r *medicine) UpsertMedicine(ctx context.Context, req model.Medicine) error {
-	medicines := table.Medicines
+	medicines := table.PharmaSheetMedicines
 
 	if req.MedicineID == "" {
 		req.MedicineID = generator.UUID()
 	}
 
 	now := time.Now()
-	medicine := genmodel.Medicines{
+	medicine := genmodel.PharmaSheetMedicines{
 		MedicineID:  uuid.MustParse(req.MedicineID),
 		WarehouseID: uuid.MustParse(req.WarehouseID),
 		LockerID:    uuid.MustParse(req.LockerID),
@@ -399,15 +399,15 @@ func (r *medicine) UpsertMedicine(ctx context.Context, req model.Medicine) error
 func (r *medicine) DeleteMedicine(ctx context.Context, filter model.DeleteMedicineFilter) (int64, error) {
 	var condition postgres.BoolExpression
 	if filter.MedicineID != "" {
-		condition = table.Medicines.MedicineID.EQ(postgres.UUID(uuid.MustParse(filter.MedicineID)))
+		condition = table.PharmaSheetMedicines.MedicineID.EQ(postgres.UUID(uuid.MustParse(filter.MedicineID)))
 	} else if filter.LockerID != "" {
-		condition = table.Medicines.LockerID.EQ(postgres.UUID(uuid.MustParse(filter.LockerID)))
+		condition = table.PharmaSheetMedicines.LockerID.EQ(postgres.UUID(uuid.MustParse(filter.LockerID)))
 	} else if filter.WarehouseID != "" {
-		condition = table.Medicines.WarehouseID.EQ(postgres.UUID(uuid.MustParse(filter.WarehouseID)))
+		condition = table.PharmaSheetMedicines.WarehouseID.EQ(postgres.UUID(uuid.MustParse(filter.WarehouseID)))
 	} else {
 		return 0, errors.New("filter is invalid")
 	}
-	stmt, args := table.Medicines.DELETE().WHERE(condition).Sql()
+	stmt, args := table.PharmaSheetMedicines.DELETE().WHERE(condition).Sql()
 	result, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)

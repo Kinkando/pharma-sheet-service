@@ -12,7 +12,7 @@ import (
 
 	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
-	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+	genmodel "github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
@@ -173,7 +173,7 @@ func (s *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 			if filter.Group != model.MyWarehouse {
 				result, err := s.GetWarehouseUsers(ctx, warehouse.WarehouseID, model.FilterWarehouseUser{
 					Pagination: model.Pagination{Page: 1, Limit: 9999},
-					Status:     genmodel.ApprovalStatus_Approved,
+					Status:     genmodel.PharmaSheetApprovalStatus_Approved,
 				})
 				if err != nil {
 					return err
@@ -200,7 +200,7 @@ func (s *warehouse) CreateWarehouse(ctx context.Context, req model.CreateWarehou
 }
 
 func (s *warehouse) UpdateWarehouse(ctx context.Context, req model.UpdateWarehouseRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -217,7 +217,7 @@ func (s *warehouse) UpdateWarehouse(ctx context.Context, req model.UpdateWarehou
 
 func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string, bypass ...bool) error {
 	if len(bypass) != 1 || !bypass[0] {
-		err := s.checkWarehouseManagementRole(ctx, warehouseID, genmodel.Role_Admin)
+		err := s.checkWarehouseManagementRole(ctx, warehouseID, genmodel.PharmaSheetRole_Admin)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return err
@@ -287,12 +287,12 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string, byp
 }
 
 func (s *warehouse) CreateWarehouseLocker(ctx context.Context, req model.CreateWarehouseLockerRequest) (string, error) {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return "", err
 	}
-	lockerID, err := s.lockerRepository.CreateLocker(ctx, genmodel.Lockers{
+	lockerID, err := s.lockerRepository.CreateLocker(ctx, genmodel.PharmaSheetLockers{
 		WarehouseID: uuid.MustParse(req.WarehouseID),
 		Name:        req.LockerName,
 	})
@@ -303,12 +303,12 @@ func (s *warehouse) CreateWarehouseLocker(ctx context.Context, req model.CreateW
 }
 
 func (s *warehouse) UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
 	}
-	err = s.lockerRepository.UpdateLocker(ctx, genmodel.Lockers{
+	err = s.lockerRepository.UpdateLocker(ctx, genmodel.PharmaSheetLockers{
 		LockerID: uuid.MustParse(req.LockerID),
 		Name:     req.LockerName,
 	})
@@ -319,7 +319,7 @@ func (s *warehouse) UpdateWarehouseLocker(ctx context.Context, req model.UpdateW
 }
 
 func (s *warehouse) DeleteWarehouseLocker(ctx context.Context, req model.DeleteWarehouseLockerRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -373,7 +373,7 @@ func (s *warehouse) DeleteWarehouseLocker(ctx context.Context, req model.DeleteW
 	return nil
 }
 
-func (s *warehouse) checkWarehouseManagementRole(ctx context.Context, warehouseID string, roles ...genmodel.Role) (err error) {
+func (s *warehouse) checkWarehouseManagementRole(ctx context.Context, warehouseID string, roles ...genmodel.PharmaSheetRole) (err error) {
 	userProfile, err := profile.UseProfile(ctx)
 	if err != nil {
 		return
@@ -429,13 +429,13 @@ func (s *warehouse) GetWarehouseUsers(ctx context.Context, warehouseID string, f
 }
 
 func (s *warehouse) CreateWarehouseUser(ctx context.Context, req model.CreateWarehouseUserRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
 	}
 
-	userReq := genmodel.Users{Email: req.Email}
+	userReq := genmodel.PharmaSheetUsers{Email: req.Email}
 	user, err := s.userRepository.GetUser(ctx, userReq)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		logger.Context(ctx).Error(err)
@@ -451,7 +451,7 @@ func (s *warehouse) CreateWarehouseUser(ctx context.Context, req model.CreateWar
 		user.UserID = uuid.MustParse(userID)
 	}
 
-	err = s.warehouseRepository.CreateWarehouseUser(ctx, req.WarehouseID, user.UserID.String(), req.Role, genmodel.ApprovalStatus_Approved)
+	err = s.warehouseRepository.CreateWarehouseUser(ctx, req.WarehouseID, user.UserID.String(), req.Role, genmodel.PharmaSheetApprovalStatus_Approved)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -460,7 +460,7 @@ func (s *warehouse) CreateWarehouseUser(ctx context.Context, req model.CreateWar
 }
 
 func (s *warehouse) UpdateWarehouseUser(ctx context.Context, req model.UpdateWarehouseUserRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -475,7 +475,7 @@ func (s *warehouse) UpdateWarehouseUser(ctx context.Context, req model.UpdateWar
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "grant yourself is not allowed"})
 	}
 
-	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.WarehouseUsers{
+	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.PharmaSheetWarehouseUsers{
 		WarehouseID: uuid.MustParse(req.WarehouseID),
 		UserID:      uuid.MustParse(req.UserID),
 		Role:        req.Role,
@@ -488,7 +488,7 @@ func (s *warehouse) UpdateWarehouseUser(ctx context.Context, req model.UpdateWar
 }
 
 func (s *warehouse) DeleteWarehouseUser(ctx context.Context, req model.DeleteWarehouseUserRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -512,7 +512,7 @@ func (s *warehouse) DeleteWarehouseUser(ctx context.Context, req model.DeleteWar
 }
 
 func (s *warehouse) JoinWarehouse(ctx context.Context, warehouseID, userID string) error {
-	return s.warehouseRepository.CreateWarehouseUser(ctx, warehouseID, userID, genmodel.Role_Viewer, genmodel.ApprovalStatus_Pending)
+	return s.warehouseRepository.CreateWarehouseUser(ctx, warehouseID, userID, genmodel.PharmaSheetRole_Viewer, genmodel.PharmaSheetApprovalStatus_Pending)
 }
 
 func (s *warehouse) CancelJoinWarehouse(ctx context.Context, warehouseID, userID string) error {
@@ -528,8 +528,8 @@ func (s *warehouse) LeaveWarehouse(ctx context.Context, warehouseID, userID stri
 
 	_, total, err := s.warehouseRepository.GetWarehouseUsers(ctx, warehouseID, model.FilterWarehouseUser{
 		Pagination: model.Pagination{Page: 1, Limit: 1},
-		Role:       genmodel.Role_Admin,
-		Status:     genmodel.ApprovalStatus_Approved,
+		Role:       genmodel.PharmaSheetRole_Admin,
+		Status:     genmodel.PharmaSheetApprovalStatus_Approved,
 	})
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -544,7 +544,7 @@ func (s *warehouse) LeaveWarehouse(ctx context.Context, warehouseID, userID stri
 }
 
 func (s *warehouse) ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -567,14 +567,14 @@ func (s *warehouse) ApproveUser(ctx context.Context, req model.ApprovalWarehouse
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	if status != genmodel.ApprovalStatus_Pending {
+	if status != genmodel.PharmaSheetApprovalStatus_Pending {
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "status is not pending"})
 	}
 
-	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.WarehouseUsers{
+	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.PharmaSheetWarehouseUsers{
 		WarehouseID: uuid.MustParse(req.WarehouseID),
 		UserID:      uuid.MustParse(req.UserID),
-		Status:      genmodel.ApprovalStatus_Approved,
+		Status:      genmodel.PharmaSheetApprovalStatus_Approved,
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -584,7 +584,7 @@ func (s *warehouse) ApproveUser(ctx context.Context, req model.ApprovalWarehouse
 }
 
 func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin)
+	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
@@ -607,7 +607,7 @@ func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseU
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	if status != genmodel.ApprovalStatus_Pending {
+	if status != genmodel.PharmaSheetApprovalStatus_Pending {
 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "status is not pending"})
 	}
 
@@ -712,7 +712,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 	for index, medicineSheet := range medicineSheets {
 		locker, ok := lockerID[medicineSheet.LockerName]
 		if !ok {
-			lockerID[medicineSheet.LockerName], err = s.lockerRepository.CreateLocker(ctx, genmodel.Lockers{
+			lockerID[medicineSheet.LockerName], err = s.lockerRepository.CreateLocker(ctx, genmodel.PharmaSheetLockers{
 				WarehouseID: uuid.MustParse(req.WarehouseID),
 				Name:        medicineSheet.LockerName,
 			})
@@ -794,7 +794,7 @@ func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.S
 }
 
 func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedicineRequest, isUpdateWarehouseSheet bool) (data model.GoogleSheetData, err error) {
-	err = s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.Role_Admin, genmodel.Role_Editor)
+	err = s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return data, err
@@ -834,7 +834,7 @@ func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedici
 	}
 
 	if isUpdateWarehouseSheet {
-		warehouseSheet := genmodel.WarehouseSheets{
+		warehouseSheet := genmodel.PharmaSheetWarehouseSheets{
 			WarehouseID:   uuid.MustParse(req.WarehouseID),
 			SpreadsheetID: spreadsheetID,
 			SheetID:       sheetID,

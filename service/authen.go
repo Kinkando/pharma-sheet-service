@@ -8,7 +8,7 @@ import (
 	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+	genmodel "github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
@@ -56,7 +56,7 @@ func (s *authen) VerifyToken(ctx context.Context, idToken string) (model.JWT, er
 		return model.JWT{}, err
 	}
 
-	jwt, err := s.createToken(ctx, genmodel.Users{FirebaseUID: &token.UID, Email: fmt.Sprintf("%+v", emails[0])})
+	jwt, err := s.createToken(ctx, genmodel.PharmaSheetUsers{FirebaseUID: &token.UID, Email: fmt.Sprintf("%+v", emails[0])})
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return model.JWT{}, err
@@ -84,7 +84,7 @@ func (s *authen) RefreshToken(ctx context.Context, refreshToken string) (model.J
 		return model.JWT{}, err
 	}
 
-	jwt, err := s.createToken(ctx, genmodel.Users{UserID: uuid.MustParse(refreshClaim.UserID)})
+	jwt, err := s.createToken(ctx, genmodel.PharmaSheetUsers{UserID: uuid.MustParse(refreshClaim.UserID)})
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return model.JWT{}, err
@@ -123,7 +123,7 @@ func (s *authen) RevokeToken(ctx context.Context, jwt string) error {
 	return nil
 }
 
-func (s *authen) createToken(ctx context.Context, userReq genmodel.Users) (jwt model.JWT, err error) {
+func (s *authen) createToken(ctx context.Context, userReq genmodel.PharmaSheetUsers) (jwt model.JWT, err error) {
 	user, err := s.userRepository.GetUser(ctx, userReq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		userID, err := s.userRepository.CreateUser(ctx, userReq)
@@ -140,7 +140,7 @@ func (s *authen) createToken(ctx context.Context, userReq genmodel.Users) (jwt m
 	}
 
 	if user.FirebaseUID == nil {
-		err = s.userRepository.UpdateUser(ctx, genmodel.Users{UserID: user.UserID, FirebaseUID: userReq.FirebaseUID})
+		err = s.userRepository.UpdateUser(ctx, genmodel.PharmaSheetUsers{UserID: user.UserID, FirebaseUID: userReq.FirebaseUID})
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return jwt, err

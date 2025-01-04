@@ -3,7 +3,7 @@ package model
 import (
 	"time"
 
-	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
+	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -31,20 +31,20 @@ type Locker struct {
 
 type FilterWarehouseDetail struct {
 	Pagination
-	Search string               `query:"search"`
-	Status model.ApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
-	Group  WarehouseGroup       `query:"group" validate:"omitempty,oneof=MY_WAREHOUSE OTHER_WAREHOUSE OTHER_WAREHOUSE_PENDING"`
+	Search string                          `query:"search"`
+	Status model.PharmaSheetApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
+	Group  WarehouseGroup                  `query:"group" validate:"omitempty,oneof=MY_WAREHOUSE OTHER_WAREHOUSE OTHER_WAREHOUSE_PENDING"`
 }
 
 type WarehouseDetail struct {
-	WarehouseID   string                `json:"warehouseID"`
-	Name          string                `json:"warehouseName"`
-	Role          *string               `json:"role,omitempty"`
-	Status        *model.ApprovalStatus `json:"status,omitempty"`
-	LockerDetails []LockerDetail        `json:"lockerDetails"`
-	TotalLocker   uint64                `json:"totalLocker"`
-	TotalMedicine uint64                `json:"totalMedicine"`
-	Users         []WarehouseUser       `json:"users,omitempty"`
+	WarehouseID   string                           `json:"warehouseID"`
+	Name          string                           `json:"warehouseName"`
+	Role          *string                          `json:"role,omitempty"`
+	Status        *model.PharmaSheetApprovalStatus `json:"status,omitempty"`
+	LockerDetails []LockerDetail                   `json:"lockerDetails"`
+	TotalLocker   uint64                           `json:"totalLocker"`
+	TotalMedicine uint64                           `json:"totalMedicine"`
+	Users         []WarehouseUser                  `json:"users,omitempty"`
 }
 
 type LockerDetail struct {
@@ -80,22 +80,22 @@ type DeleteWarehouseLockerRequest struct {
 
 type FilterWarehouseUser struct {
 	Pagination
-	WarehouseID string               `param:"warehouseID" validate:"required,uuid"`
-	Search      string               `query:"search"`
-	Status      model.ApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
-	Role        model.Role           `query:"role" validate:"omitempty,oneof=ADMIN EDITOR VIEWER"`
+	WarehouseID string                          `param:"warehouseID" validate:"required,uuid"`
+	Search      string                          `query:"search"`
+	Status      model.PharmaSheetApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
+	Role        model.PharmaSheetRole           `query:"role" validate:"omitempty,oneof=ADMIN EDITOR VIEWER"`
 }
 
 type CreateWarehouseUserRequest struct {
-	WarehouseID string     `param:"warehouseID" validate:"required,uuid"`
-	Email       string     `json:"email" validate:"required,email"`
-	Role        model.Role `json:"role" validate:"required,oneof=ADMIN EDITOR VIEWER"`
+	WarehouseID string                `param:"warehouseID" validate:"required,uuid"`
+	Email       string                `json:"email" validate:"required,email"`
+	Role        model.PharmaSheetRole `json:"role" validate:"required,oneof=ADMIN EDITOR VIEWER"`
 }
 
 type UpdateWarehouseUserRequest struct {
-	WarehouseID string     `param:"warehouseID" validate:"required,uuid"`
-	UserID      string     `param:"userID" validate:"required,uuid"`
-	Role        model.Role `param:"role" validate:"required,oneof=ADMIN EDITOR VIEWER"`
+	WarehouseID string                `param:"warehouseID" validate:"required,uuid"`
+	UserID      string                `param:"userID" validate:"required,uuid"`
+	Role        model.PharmaSheetRole `param:"role" validate:"required,oneof=ADMIN EDITOR VIEWER"`
 }
 
 type DeleteWarehouseUserRequest struct {
@@ -119,8 +119,8 @@ type CountWarehouseUserStatus struct {
 
 type WarehouseUser struct {
 	User
-	Role   model.Role           `json:"role"`
-	Status model.ApprovalStatus `json:"status"`
+	Role   model.PharmaSheetRole           `json:"role"`
+	Status model.PharmaSheetApprovalStatus `json:"status"`
 }
 
 type DeleteLockerFilter struct {
