@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_warehouse_users (
 CREATE TABLE IF NOT EXISTS pharma_sheet_medicines (
   medication_id TEXT PRIMARY KEY,
   medical_name TEXT NOT NULL,
-  label TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -65,6 +64,7 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_medicine_houses (
   locker TEXT NOT NULL,
   floor INT NOT NULL,
   no INT NOT NULL,
+  label TEXT,
   blister_change_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -74,12 +74,14 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_medicine_houses (
 );
 
 CREATE TABLE IF NOT EXISTS pharma_sheet_warehouse_sheets (
-  spreadsheet_id TEXT PRIMARY KEY,
+  warehouse_id TEXT PRIMARY KEY,
+  spreadsheet_id TEXT NOT NULL,
   medicine_sheet_id INT NOT NULL,
   medicine_brand_sheet_id INT NOT NULL,
   medicine_house_sheet_id INT NOT NULL,
   latest_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id),
   CONSTRAINT unique_pharma_sheet_warehouse_sheet UNIQUE (spreadsheet_id, medicine_sheet_id, medicine_brand_sheet_id, medicine_house_sheet_id)
 )
 

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"slices"
 
-	genmodel "github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
+	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"

@@ -17,6 +17,7 @@ type pharmaSheetWarehouseSheetsTable struct {
 	postgres.Table
 
 	// Columns
+	WarehouseID          postgres.ColumnString
 	SpreadsheetID        postgres.ColumnString
 	MedicineSheetID      postgres.ColumnInteger
 	MedicineBrandSheetID postgres.ColumnInteger
@@ -63,20 +64,22 @@ func newPharmaSheetWarehouseSheetsTable(schemaName, tableName, alias string) *Ph
 
 func newPharmaSheetWarehouseSheetsTableImpl(schemaName, tableName, alias string) pharmaSheetWarehouseSheetsTable {
 	var (
+		WarehouseIDColumn          = postgres.StringColumn("warehouse_id")
 		SpreadsheetIDColumn        = postgres.StringColumn("spreadsheet_id")
 		MedicineSheetIDColumn      = postgres.IntegerColumn("medicine_sheet_id")
 		MedicineBrandSheetIDColumn = postgres.IntegerColumn("medicine_brand_sheet_id")
 		MedicineHouseSheetIDColumn = postgres.IntegerColumn("medicine_house_sheet_id")
 		LatestSyncedAtColumn       = postgres.TimestampzColumn("latest_synced_at")
 		CreatedAtColumn            = postgres.TimestampzColumn("created_at")
-		allColumns                 = postgres.ColumnList{SpreadsheetIDColumn, MedicineSheetIDColumn, MedicineBrandSheetIDColumn, MedicineHouseSheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
-		mutableColumns             = postgres.ColumnList{MedicineSheetIDColumn, MedicineBrandSheetIDColumn, MedicineHouseSheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
+		allColumns                 = postgres.ColumnList{WarehouseIDColumn, SpreadsheetIDColumn, MedicineSheetIDColumn, MedicineBrandSheetIDColumn, MedicineHouseSheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
+		mutableColumns             = postgres.ColumnList{SpreadsheetIDColumn, MedicineSheetIDColumn, MedicineBrandSheetIDColumn, MedicineHouseSheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
 	)
 
 	return pharmaSheetWarehouseSheetsTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
+		WarehouseID:          WarehouseIDColumn,
 		SpreadsheetID:        SpreadsheetIDColumn,
 		MedicineSheetID:      MedicineSheetIDColumn,
 		MedicineBrandSheetID: MedicineBrandSheetIDColumn,

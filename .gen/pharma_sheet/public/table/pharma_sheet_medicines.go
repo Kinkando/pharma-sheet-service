@@ -19,7 +19,6 @@ type pharmaSheetMedicinesTable struct {
 	// Columns
 	MedicationID postgres.ColumnString
 	MedicalName  postgres.ColumnString
-	Label        postgres.ColumnString
 	CreatedAt    postgres.ColumnTimestampz
 	UpdatedAt    postgres.ColumnTimestampz
 
@@ -64,11 +63,10 @@ func newPharmaSheetMedicinesTableImpl(schemaName, tableName, alias string) pharm
 	var (
 		MedicationIDColumn = postgres.StringColumn("medication_id")
 		MedicalNameColumn  = postgres.StringColumn("medical_name")
-		LabelColumn        = postgres.StringColumn("label")
 		CreatedAtColumn    = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn    = postgres.TimestampzColumn("updated_at")
-		allColumns         = postgres.ColumnList{MedicationIDColumn, MedicalNameColumn, LabelColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns     = postgres.ColumnList{MedicalNameColumn, LabelColumn, CreatedAtColumn, UpdatedAtColumn}
+		allColumns         = postgres.ColumnList{MedicationIDColumn, MedicalNameColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns     = postgres.ColumnList{MedicalNameColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return pharmaSheetMedicinesTable{
@@ -77,7 +75,6 @@ func newPharmaSheetMedicinesTableImpl(schemaName, tableName, alias string) pharm
 		//Columns
 		MedicationID: MedicationIDColumn,
 		MedicalName:  MedicalNameColumn,
-		Label:        LabelColumn,
 		CreatedAt:    CreatedAtColumn,
 		UpdatedAt:    UpdatedAtColumn,
 

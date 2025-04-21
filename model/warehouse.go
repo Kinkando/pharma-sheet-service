@@ -3,7 +3,7 @@ package model
 import (
 	"time"
 
-	"github.com/kinkando/pharma-sheet-service/.gen/postgresql_kinkando/public/model"
+	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"google.golang.org/api/sheets/v4"
 )
 

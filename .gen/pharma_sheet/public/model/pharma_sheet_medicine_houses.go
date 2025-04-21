@@ -17,6 +17,7 @@ type PharmaSheetMedicineHouses struct {
 	Locker            string
 	Floor             int32
 	No                int32
+	Label             *string
 	BlisterChangeDate *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time

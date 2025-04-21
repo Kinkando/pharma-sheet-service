@@ -14,7 +14,6 @@ import (
 type PharmaSheetMedicines struct {
 	MedicationID string `sql:"primary_key"`
 	MedicalName  string
-	Label        *string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

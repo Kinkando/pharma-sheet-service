@@ -12,7 +12,8 @@ import (
 )
 
 type PharmaSheetWarehouseSheets struct {
-	SpreadsheetID        string `sql:"primary_key"`
+	WarehouseID          string `sql:"primary_key"`
+	SpreadsheetID        string
 	MedicineSheetID      int32
 	MedicineBrandSheetID int32
 	MedicineHouseSheetID int32

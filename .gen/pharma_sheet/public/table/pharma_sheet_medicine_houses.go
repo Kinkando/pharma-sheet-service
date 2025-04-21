@@ -22,6 +22,7 @@ type pharmaSheetMedicineHousesTable struct {
 	Locker            postgres.ColumnString
 	Floor             postgres.ColumnInteger
 	No                postgres.ColumnInteger
+	Label             postgres.ColumnString
 	BlisterChangeDate postgres.ColumnDate
 	CreatedAt         postgres.ColumnTimestampz
 	UpdatedAt         postgres.ColumnTimestampz
@@ -70,11 +71,12 @@ func newPharmaSheetMedicineHousesTableImpl(schemaName, tableName, alias string) 
 		LockerColumn            = postgres.StringColumn("locker")
 		FloorColumn             = postgres.IntegerColumn("floor")
 		NoColumn                = postgres.IntegerColumn("no")
+		LabelColumn             = postgres.StringColumn("label")
 		BlisterChangeDateColumn = postgres.DateColumn("blister_change_date")
 		CreatedAtColumn         = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn         = postgres.TimestampzColumn("updated_at")
-		allColumns              = postgres.ColumnList{WarehouseIDColumn, MedicineBrandIDColumn, LockerColumn, FloorColumn, NoColumn, BlisterChangeDateColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns          = postgres.ColumnList{WarehouseIDColumn, MedicineBrandIDColumn, LockerColumn, FloorColumn, NoColumn, BlisterChangeDateColumn, CreatedAtColumn, UpdatedAtColumn}
+		allColumns              = postgres.ColumnList{WarehouseIDColumn, MedicineBrandIDColumn, LockerColumn, FloorColumn, NoColumn, LabelColumn, BlisterChangeDateColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns          = postgres.ColumnList{WarehouseIDColumn, MedicineBrandIDColumn, LockerColumn, FloorColumn, NoColumn, LabelColumn, BlisterChangeDateColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return pharmaSheetMedicineHousesTable{
@@ -86,6 +88,7 @@ func newPharmaSheetMedicineHousesTableImpl(schemaName, tableName, alias string) 
 		Locker:            LockerColumn,
 		Floor:             FloorColumn,
 		No:                NoColumn,
+		Label:             LabelColumn,
 		BlisterChangeDate: BlisterChangeDateColumn,
 		CreatedAt:         CreatedAtColumn,
 		UpdatedAt:         UpdatedAtColumn,
