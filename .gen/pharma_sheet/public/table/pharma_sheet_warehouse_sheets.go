@@ -17,11 +17,12 @@ type pharmaSheetWarehouseSheetsTable struct {
 	postgres.Table
 
 	// Columns
-	WarehouseID    postgres.ColumnString
-	SpreadsheetID  postgres.ColumnString
-	SheetID        postgres.ColumnInteger
-	LatestSyncedAt postgres.ColumnTimestampz
-	CreatedAt      postgres.ColumnTimestampz
+	SpreadsheetID        postgres.ColumnString
+	MedicineSheetID      postgres.ColumnInteger
+	MedicineBrandSheetID postgres.ColumnInteger
+	MedicineHouseSheetID postgres.ColumnInteger
+	LatestSyncedAt       postgres.ColumnTimestampz
+	CreatedAt            postgres.ColumnTimestampz
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -62,24 +63,26 @@ func newPharmaSheetWarehouseSheetsTable(schemaName, tableName, alias string) *Ph
 
 func newPharmaSheetWarehouseSheetsTableImpl(schemaName, tableName, alias string) pharmaSheetWarehouseSheetsTable {
 	var (
-		WarehouseIDColumn    = postgres.StringColumn("warehouse_id")
-		SpreadsheetIDColumn  = postgres.StringColumn("spreadsheet_id")
-		SheetIDColumn        = postgres.IntegerColumn("sheet_id")
-		LatestSyncedAtColumn = postgres.TimestampzColumn("latest_synced_at")
-		CreatedAtColumn      = postgres.TimestampzColumn("created_at")
-		allColumns           = postgres.ColumnList{WarehouseIDColumn, SpreadsheetIDColumn, SheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
-		mutableColumns       = postgres.ColumnList{WarehouseIDColumn, SpreadsheetIDColumn, SheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
+		SpreadsheetIDColumn        = postgres.StringColumn("spreadsheet_id")
+		MedicineSheetIDColumn      = postgres.IntegerColumn("medicine_sheet_id")
+		MedicineBrandSheetIDColumn = postgres.IntegerColumn("medicine_brand_sheet_id")
+		MedicineHouseSheetIDColumn = postgres.IntegerColumn("medicine_house_sheet_id")
+		LatestSyncedAtColumn       = postgres.TimestampzColumn("latest_synced_at")
+		CreatedAtColumn            = postgres.TimestampzColumn("created_at")
+		allColumns                 = postgres.ColumnList{SpreadsheetIDColumn, MedicineSheetIDColumn, MedicineBrandSheetIDColumn, MedicineHouseSheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
+		mutableColumns             = postgres.ColumnList{MedicineSheetIDColumn, MedicineBrandSheetIDColumn, MedicineHouseSheetIDColumn, LatestSyncedAtColumn, CreatedAtColumn}
 	)
 
 	return pharmaSheetWarehouseSheetsTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		WarehouseID:    WarehouseIDColumn,
-		SpreadsheetID:  SpreadsheetIDColumn,
-		SheetID:        SheetIDColumn,
-		LatestSyncedAt: LatestSyncedAtColumn,
-		CreatedAt:      CreatedAtColumn,
+		SpreadsheetID:        SpreadsheetIDColumn,
+		MedicineSheetID:      MedicineSheetIDColumn,
+		MedicineBrandSheetID: MedicineBrandSheetIDColumn,
+		MedicineHouseSheetID: MedicineHouseSheetIDColumn,
+		LatestSyncedAt:       LatestSyncedAtColumn,
+		CreatedAt:            CreatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,
