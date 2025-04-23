@@ -17,9 +17,10 @@ type pharmaSheetMedicineBrandsTable struct {
 	postgres.Table
 
 	// Columns
-	MedicineBrandID postgres.ColumnString
+	ID              postgres.ColumnString
 	MedicationID    postgres.ColumnString
-	BrandName       postgres.ColumnString
+	TradeID         postgres.ColumnString
+	TradeName       postgres.ColumnString
 	BlisterImageURL postgres.ColumnString
 	TabletImageURL  postgres.ColumnString
 	BoxImageURL     postgres.ColumnString
@@ -65,25 +66,27 @@ func newPharmaSheetMedicineBrandsTable(schemaName, tableName, alias string) *Pha
 
 func newPharmaSheetMedicineBrandsTableImpl(schemaName, tableName, alias string) pharmaSheetMedicineBrandsTable {
 	var (
-		MedicineBrandIDColumn = postgres.StringColumn("medicine_brand_id")
+		IDColumn              = postgres.StringColumn("id")
 		MedicationIDColumn    = postgres.StringColumn("medication_id")
-		BrandNameColumn       = postgres.StringColumn("brand_name")
+		TradeIDColumn         = postgres.StringColumn("trade_id")
+		TradeNameColumn       = postgres.StringColumn("trade_name")
 		BlisterImageURLColumn = postgres.StringColumn("blister_image_url")
 		TabletImageURLColumn  = postgres.StringColumn("tablet_image_url")
 		BoxImageURLColumn     = postgres.StringColumn("box_image_url")
 		CreatedAtColumn       = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn       = postgres.TimestampzColumn("updated_at")
-		allColumns            = postgres.ColumnList{MedicineBrandIDColumn, MedicationIDColumn, BrandNameColumn, BlisterImageURLColumn, TabletImageURLColumn, BoxImageURLColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns        = postgres.ColumnList{MedicationIDColumn, BrandNameColumn, BlisterImageURLColumn, TabletImageURLColumn, BoxImageURLColumn, CreatedAtColumn, UpdatedAtColumn}
+		allColumns            = postgres.ColumnList{IDColumn, MedicationIDColumn, TradeIDColumn, TradeNameColumn, BlisterImageURLColumn, TabletImageURLColumn, BoxImageURLColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns        = postgres.ColumnList{MedicationIDColumn, TradeIDColumn, TradeNameColumn, BlisterImageURLColumn, TabletImageURLColumn, BoxImageURLColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return pharmaSheetMedicineBrandsTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		MedicineBrandID: MedicineBrandIDColumn,
+		ID:              IDColumn,
 		MedicationID:    MedicationIDColumn,
-		BrandName:       BrandNameColumn,
+		TradeID:         TradeIDColumn,
+		TradeName:       TradeNameColumn,
 		BlisterImageURL: BlisterImageURLColumn,
 		TabletImageURL:  TabletImageURLColumn,
 		BoxImageURL:     BoxImageURLColumn,

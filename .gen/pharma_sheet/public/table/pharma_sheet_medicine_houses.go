@@ -17,15 +17,15 @@ type pharmaSheetMedicineHousesTable struct {
 	postgres.Table
 
 	// Columns
-	WarehouseID       postgres.ColumnString
-	MedicineBrandID   postgres.ColumnString
-	Locker            postgres.ColumnString
-	Floor             postgres.ColumnInteger
-	No                postgres.ColumnInteger
-	Label             postgres.ColumnString
-	BlisterChangeDate postgres.ColumnDate
-	CreatedAt         postgres.ColumnTimestampz
-	UpdatedAt         postgres.ColumnTimestampz
+	ID           postgres.ColumnString
+	WarehouseID  postgres.ColumnString
+	MedicationID postgres.ColumnString
+	Locker       postgres.ColumnString
+	Floor        postgres.ColumnInteger
+	No           postgres.ColumnInteger
+	Label        postgres.ColumnString
+	CreatedAt    postgres.ColumnTimestampz
+	UpdatedAt    postgres.ColumnTimestampz
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -66,32 +66,32 @@ func newPharmaSheetMedicineHousesTable(schemaName, tableName, alias string) *Pha
 
 func newPharmaSheetMedicineHousesTableImpl(schemaName, tableName, alias string) pharmaSheetMedicineHousesTable {
 	var (
-		WarehouseIDColumn       = postgres.StringColumn("warehouse_id")
-		MedicineBrandIDColumn   = postgres.StringColumn("medicine_brand_id")
-		LockerColumn            = postgres.StringColumn("locker")
-		FloorColumn             = postgres.IntegerColumn("floor")
-		NoColumn                = postgres.IntegerColumn("no")
-		LabelColumn             = postgres.StringColumn("label")
-		BlisterChangeDateColumn = postgres.DateColumn("blister_change_date")
-		CreatedAtColumn         = postgres.TimestampzColumn("created_at")
-		UpdatedAtColumn         = postgres.TimestampzColumn("updated_at")
-		allColumns              = postgres.ColumnList{WarehouseIDColumn, MedicineBrandIDColumn, LockerColumn, FloorColumn, NoColumn, LabelColumn, BlisterChangeDateColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns          = postgres.ColumnList{WarehouseIDColumn, MedicineBrandIDColumn, LockerColumn, FloorColumn, NoColumn, LabelColumn, BlisterChangeDateColumn, CreatedAtColumn, UpdatedAtColumn}
+		IDColumn           = postgres.StringColumn("id")
+		WarehouseIDColumn  = postgres.StringColumn("warehouse_id")
+		MedicationIDColumn = postgres.StringColumn("medication_id")
+		LockerColumn       = postgres.StringColumn("locker")
+		FloorColumn        = postgres.IntegerColumn("floor")
+		NoColumn           = postgres.IntegerColumn("no")
+		LabelColumn        = postgres.StringColumn("label")
+		CreatedAtColumn    = postgres.TimestampzColumn("created_at")
+		UpdatedAtColumn    = postgres.TimestampzColumn("updated_at")
+		allColumns         = postgres.ColumnList{IDColumn, WarehouseIDColumn, MedicationIDColumn, LockerColumn, FloorColumn, NoColumn, LabelColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns     = postgres.ColumnList{WarehouseIDColumn, MedicationIDColumn, LockerColumn, FloorColumn, NoColumn, LabelColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return pharmaSheetMedicineHousesTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		WarehouseID:       WarehouseIDColumn,
-		MedicineBrandID:   MedicineBrandIDColumn,
-		Locker:            LockerColumn,
-		Floor:             FloorColumn,
-		No:                NoColumn,
-		Label:             LabelColumn,
-		BlisterChangeDate: BlisterChangeDateColumn,
-		CreatedAt:         CreatedAtColumn,
-		UpdatedAt:         UpdatedAtColumn,
+		ID:           IDColumn,
+		WarehouseID:  WarehouseIDColumn,
+		MedicationID: MedicationIDColumn,
+		Locker:       LockerColumn,
+		Floor:        FloorColumn,
+		No:           NoColumn,
+		Label:        LabelColumn,
+		CreatedAt:    CreatedAtColumn,
+		UpdatedAt:    UpdatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

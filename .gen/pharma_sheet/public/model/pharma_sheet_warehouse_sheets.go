@@ -12,11 +12,12 @@ import (
 )
 
 type PharmaSheetWarehouseSheets struct {
-	WarehouseID          string `sql:"primary_key"`
-	SpreadsheetID        string
-	MedicineSheetID      int32
-	MedicineBrandSheetID int32
-	MedicineHouseSheetID int32
-	LatestSyncedAt       time.Time
-	CreatedAt            time.Time
+	WarehouseID                       string `sql:"primary_key"`
+	SpreadsheetID                     string
+	MedicineSheetID                   int32
+	MedicineBrandSheetID              int32
+	MedicineHouseSheetID              int32
+	MedicineBlisterDateHistorySheetID int32
+	LatestSyncedAt                    time.Time
+	CreatedAt                         time.Time
 }

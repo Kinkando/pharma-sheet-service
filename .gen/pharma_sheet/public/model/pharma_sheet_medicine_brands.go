@@ -8,13 +8,15 @@
 package model
 
 import (
+	"github.com/google/uuid"
 	"time"
 )
 
 type PharmaSheetMedicineBrands struct {
-	MedicineBrandID string `sql:"primary_key"`
+	ID              uuid.UUID `sql:"primary_key"`
 	MedicationID    string
-	BrandName       string
+	TradeID         string
+	TradeName       *string
 	BlisterImageURL *string
 	TabletImageURL  *string
 	BoxImageURL     *string
