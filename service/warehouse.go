@@ -16,13 +16,10 @@ import (
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
-	"github.com/kinkando/pharma-sheet-service/pkg/option"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/labstack/echo/v4"
 	"github.com/sourcegraph/conc/pool"
-	"github.com/xuri/excelize/v2"
-	"google.golang.org/api/sheets/v4"
 )
 
 type Warehouse interface {
@@ -32,10 +29,6 @@ type Warehouse interface {
 	CreateWarehouse(ctx context.Context, req model.CreateWarehouseRequest) (string, error)
 	UpdateWarehouse(ctx context.Context, req model.UpdateWarehouseRequest) error
 	DeleteWarehouse(ctx context.Context, warehouseID string, bypass ...bool) error
-
-	CreateWarehouseLocker(ctx context.Context, req model.CreateWarehouseLockerRequest) (string, error)
-	UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error
-	DeleteWarehouseLocker(ctx context.Context, req model.DeleteWarehouseLockerRequest) error
 
 	CountWarehouseUserStatus(ctx context.Context, warehouseID string) (model.CountWarehouseUserStatus, error)
 	GetWarehouseUsers(ctx context.Context, warehouseID string, filter model.FilterWarehouseUser) (model.PagingWithMetadata[model.WarehouseUser], error)
@@ -54,82 +47,42 @@ type Warehouse interface {
 
 type warehouse struct {
 	warehouseRepository repository.Warehouse
-	lockerRepository    repository.Locker
 	userRepository      repository.User
 	medicineRepository  repository.Medicine
 	firebaseAuthen      *auth.Client
 	storage             google.Storage
+	drive               google.Drive
 	sheet               google.Sheet
 	isSyncUniqueByID    bool
 }
 
 func NewWarehouseService(
 	warehouseRepository repository.Warehouse,
-	lockerRepository repository.Locker,
 	userRepository repository.User,
 	medicineRepository repository.Medicine,
 	firebaseAuthen *auth.Client,
 	storage google.Storage,
+	drive google.Drive,
 	sheet google.Sheet,
 ) Warehouse {
 	return &warehouse{
 		warehouseRepository: warehouseRepository,
-		lockerRepository:    lockerRepository,
 		userRepository:      userRepository,
 		medicineRepository:  medicineRepository,
 		firebaseAuthen:      firebaseAuthen,
 		storage:             storage,
+		drive:               drive,
 		sheet:               sheet,
 		isSyncUniqueByID:    false,
 	}
 }
 
 func (s *warehouse) GetWarehouse(ctx context.Context, warehouseID string) (model.Warehouse, error) {
-	warehouse, err := s.warehouseRepository.GetWarehouse(ctx, warehouseID)
-	if err != nil {
-		return model.Warehouse{}, err
-	}
-
-	lockers, err := s.lockerRepository.GetLockers(ctx, warehouse.WarehouseID)
-	if err != nil {
-		return model.Warehouse{}, err
-	}
-
-	warehouseLockers := make([]model.Locker, 0, len(lockers))
-	for _, locker := range lockers {
-		warehouseLockers = append(warehouseLockers, model.Locker{
-			LockerID:   locker.LockerID.String(),
-			LockerName: locker.Name,
-		})
-	}
-	warehouse.Lockers = warehouseLockers
-
-	return warehouse, nil
+	return s.warehouseRepository.GetWarehouse(ctx, warehouseID)
 }
 
 func (s *warehouse) GetWarehouses(ctx context.Context) ([]model.Warehouse, error) {
-	warehouses, err := s.warehouseRepository.GetWarehouses(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for index, warehouse := range warehouses {
-		lockers, err := s.lockerRepository.GetLockers(ctx, warehouse.WarehouseID)
-		if err != nil {
-			return nil, err
-		}
-
-		warehouseLockers := make([]model.Locker, 0, len(lockers))
-		for _, locker := range lockers {
-			warehouseLockers = append(warehouseLockers, model.Locker{
-				LockerID:   locker.LockerID.String(),
-				LockerName: locker.Name,
-			})
-		}
-		warehouses[index].Lockers = warehouseLockers
-	}
-
-	return warehouses, nil
+	return s.warehouseRepository.GetWarehouses(ctx)
 }
 
 func (s *warehouse) GetWarehouseDetails(ctx context.Context, filter model.FilterWarehouseDetail) (res model.PagingWithMetadata[model.WarehouseDetail], err error) {
@@ -143,32 +96,11 @@ func (s *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 	for index, warehouse := range data {
 		index, warehouse := index, warehouse
 		conc.Go(func(ctx context.Context) error {
-			lockers, err := s.lockerRepository.GetLockers(ctx, warehouse.WarehouseID)
+			medicineHouses, err := s.medicineRepository.GetMedicineHouses(ctx, model.FilterMedicineHouse{WarehouseID: warehouse.WarehouseID})
 			if err != nil {
 				return err
 			}
-
-			medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: warehouse.WarehouseID})
-			if err != nil {
-				return err
-			}
-
-			medicineLockerCount := make(map[string]uint64)
-			for _, medicine := range medicines {
-				medicineLockerCount[medicine.LockerID]++
-			}
-
-			warehouseLockers := make([]model.LockerDetail, 0, len(lockers))
-			for _, locker := range lockers {
-				warehouseLockers = append(warehouseLockers, model.LockerDetail{
-					LockerID:      locker.LockerID.String(),
-					LockerName:    locker.Name,
-					TotalMedicine: medicineLockerCount[locker.LockerID.String()],
-				})
-			}
-			data[index].LockerDetails = warehouseLockers
-			data[index].TotalLocker = uint64(len(lockers))
-			data[index].TotalMedicine = uint64(len(medicines))
+			data[index].TotalMedicine = uint64(len(medicineHouses))
 
 			if filter.Group != model.MyWarehouse {
 				result, err := s.GetWarehouseUsers(ctx, warehouse.WarehouseID, model.FilterWarehouseUser{
@@ -195,7 +127,8 @@ func (s *warehouse) GetWarehouseDetails(ctx context.Context, filter model.Filter
 
 func (s *warehouse) CreateWarehouse(ctx context.Context, req model.CreateWarehouseRequest) (string, error) {
 	return s.warehouseRepository.CreateWarehouse(ctx, model.Warehouse{
-		Name: req.WarehouseName,
+		Name:        req.WarehouseName,
+		WarehouseID: req.WarehouseID,
 	})
 }
 
@@ -224,55 +157,37 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string, byp
 		}
 	}
 
-	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: warehouseID})
+	medicineBrands, err := s.medicineRepository.GetMedicineBrands(ctx, model.FilterMedicineBrand{WarehouseID: warehouseID})
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
 	}
 
-	if len(medicines) > 0 {
+	deleteFile := func(ctx context.Context, fileID string) func(ctx context.Context) error {
+		err = s.drive.Delete(ctx, fileID)
+		if err != nil {
+			logger.Context(ctx).Warn(err)
+		}
+		return nil
+	}
+
+	if len(medicineBrands) > 0 {
 		conc := pool.New().WithContext(ctx).WithMaxGoroutines(5).WithCancelOnError()
-		for index := range medicines {
-			medicine := medicines[index]
-			if medicine.ImageURL != nil {
-				conc.Go(func(ctx context.Context) error {
-					err = s.storage.RemoveFile(ctx, *medicine.ImageURL)
-					if err != nil {
-						logger.Context(ctx).Warn(err)
-					}
-					return nil
-				})
+		for _, brand := range medicineBrands {
+			brand := brand
+			if brand.BlisterImageURL != nil {
+				conc.Go(deleteFile(ctx, *brand.BlisterImageURL))
+			}
+			if brand.BoxImageURL != nil {
+				conc.Go(deleteFile(ctx, *brand.BoxImageURL))
+			}
+			if brand.TabletImageURL != nil {
+				conc.Go(deleteFile(ctx, *brand.TabletImageURL))
 			}
 		}
 		if err = conc.Wait(); err != nil {
 			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicine is not found"})
-
 		}
-
-		rowsAffected, err := s.medicineRepository.DeleteMedicine(ctx, model.DeleteMedicineFilter{WarehouseID: warehouseID})
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": "medicine is not found"})
-		}
-
-		if rowsAffected == 0 {
-			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicine is not found"})
-		}
-	}
-
-	_, err = s.lockerRepository.DeleteLocker(ctx, model.DeleteLockerFilter{WarehouseID: warehouseID})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-
-	err = s.warehouseRepository.DeleteWarehouseUser(ctx, warehouseID, nil)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-	}
-
-	err = s.warehouseRepository.DeleteWarehouseSheet(ctx, warehouseID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
 	}
 
 	err = s.warehouseRepository.DeleteWarehouse(ctx, warehouseID)
@@ -281,93 +196,6 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string, byp
 			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": err.Error()})
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-
-	return nil
-}
-
-func (s *warehouse) CreateWarehouseLocker(ctx context.Context, req model.CreateWarehouseLockerRequest) (string, error) {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return "", err
-	}
-	lockerID, err := s.lockerRepository.CreateLocker(ctx, genmodel.PharmaSheetLockers{
-		WarehouseID: uuid.MustParse(req.WarehouseID),
-		Name:        req.LockerName,
-	})
-	if err != nil {
-		return "", echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	return lockerID, nil
-}
-
-func (s *warehouse) UpdateWarehouseLocker(ctx context.Context, req model.UpdateWarehouseLockerRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
-	}
-	err = s.lockerRepository.UpdateLocker(ctx, genmodel.PharmaSheetLockers{
-		LockerID: uuid.MustParse(req.LockerID),
-		Name:     req.LockerName,
-	})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	return nil
-}
-
-func (s *warehouse) DeleteWarehouseLocker(ctx context.Context, req model.DeleteWarehouseLockerRequest) error {
-	err := s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
-	}
-
-	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{LockerID: req.LockerID})
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
-	}
-
-	if len(medicines) > 0 {
-		conc := pool.New().WithContext(ctx).WithMaxGoroutines(5).WithCancelOnError()
-		for index := range medicines {
-			medicine := medicines[index]
-			if medicine.ImageURL != nil {
-				conc.Go(func(ctx context.Context) error {
-					err = s.storage.RemoveFile(ctx, *medicine.ImageURL)
-					if err != nil {
-						logger.Context(ctx).Warn(err)
-					}
-					return nil
-				})
-			}
-		}
-		if err = conc.Wait(); err != nil {
-			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicine is not found"})
-
-		}
-
-		rowsAffected, err := s.medicineRepository.DeleteMedicine(ctx, model.DeleteMedicineFilter{LockerID: req.LockerID})
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": "medicine is not found"})
-		}
-
-		if rowsAffected == 0 {
-			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicine is not found"})
-		}
-	}
-
-	rowsAffected, err := s.lockerRepository.DeleteLocker(ctx, model.DeleteLockerFilter{LockerID: req.LockerID})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-
-	if rowsAffected == 0 {
-		return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "lockerID is not found"})
 	}
 
 	return nil
@@ -476,7 +304,7 @@ func (s *warehouse) UpdateWarehouseUser(ctx context.Context, req model.UpdateWar
 	}
 
 	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.PharmaSheetWarehouseUsers{
-		WarehouseID: uuid.MustParse(req.WarehouseID),
+		WarehouseID: req.WarehouseID,
 		UserID:      uuid.MustParse(req.UserID),
 		Role:        req.Role,
 	})
@@ -572,7 +400,7 @@ func (s *warehouse) ApproveUser(ctx context.Context, req model.ApprovalWarehouse
 	}
 
 	err = s.warehouseRepository.UpdateWarehouseUser(ctx, genmodel.PharmaSheetWarehouseUsers{
-		WarehouseID: uuid.MustParse(req.WarehouseID),
+		WarehouseID: req.WarehouseID,
 		UserID:      uuid.MustParse(req.UserID),
 		Status:      genmodel.PharmaSheetApprovalStatus_Approved,
 	})
@@ -620,273 +448,275 @@ func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseU
 }
 
 func (s *warehouse) SummarizeMedicineFromGoogleSheet(ctx context.Context, req model.GetSyncMedicineMetadataRequest) (metadata model.SyncMedicineMetadata, err error) {
-	data, err := s.getGoogleSheetData(ctx, model.SyncMedicineRequest(req), false)
-	if err != nil {
-		return
-	}
+	panic("TODO: implement me!")
+	// data, err := s.getGoogleSheetData(ctx, model.SyncMedicineRequest(req), false)
+	// if err != nil {
+	// 	return
+	// }
 
-	var (
-		totalMedicine        uint64 = 0
-		totalNewMedicine     uint64 = 0
-		totalUpdatedMedicine uint64 = 0
-		totalSkippedMedicine uint64 = 0
-	)
+	// var (
+	// 	totalMedicine        uint64 = 0
+	// 	totalNewMedicine     uint64 = 0
+	// 	totalUpdatedMedicine uint64 = 0
+	// 	totalSkippedMedicine uint64 = 0
+	// )
 
-	for _, medicineSheet := range data.MedicineSheets {
-		totalMedicine++
+	// for _, medicineSheet := range data.MedicineSheets {
+	// 	totalMedicine++
 
-		key := medicineSheet.Address
-		if s.isSyncUniqueByID {
-			key = medicineSheet.MedicineID
-		}
+	// 	key := medicineSheet.Address
+	// 	if s.isSyncUniqueByID {
+	// 		key = medicineSheet.MedicationID
+	// 	}
 
-		medicine, ok := data.MedicineData[key]
-		if !ok {
-			totalNewMedicine++
-			continue
-		}
+	// 	medicine, ok := data.MedicineData[key]
+	// 	if !ok {
+	// 		totalNewMedicine++
+	// 		continue
+	// 	}
 
-		locker, ok := data.LockerID[medicineSheet.LockerName]
-		if !ok || locker != medicine.LockerID || medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
-			totalUpdatedMedicine++
-		} else {
-			totalSkippedMedicine++
-		}
-	}
+	// 	if !ok || medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
+	// 		totalUpdatedMedicine++
+	// 	} else {
+	// 		totalSkippedMedicine++
+	// 	}
+	// }
 
-	metadata = model.SyncMedicineMetadata{
-		Title:                data.SpreadsheetTitle,
-		SheetName:            data.Sheet.Properties.Title,
-		TotalMedicine:        totalMedicine,
-		TotalNewMedicine:     totalNewMedicine,
-		TotalUpdatedMedicine: totalUpdatedMedicine,
-		TotalSkippedMedicine: totalSkippedMedicine,
-	}
+	// metadata = model.SyncMedicineMetadata{
+	// 	Title:                data.SpreadsheetTitle,
+	// 	SheetName:            data.Sheet.Properties.Title,
+	// 	TotalMedicine:        totalMedicine,
+	// 	TotalNewMedicine:     totalNewMedicine,
+	// 	TotalUpdatedMedicine: totalUpdatedMedicine,
+	// 	TotalSkippedMedicine: totalSkippedMedicine,
+	// }
 
-	return metadata, nil
+	// return metadata, nil
 }
 
 func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error {
-	data, err := s.getGoogleSheetData(ctx, req, true)
-	if err != nil {
-		return err
-	}
+	panic("TODO: implement me!")
+	// data, err := s.getGoogleSheetData(ctx, req, true)
+	// if err != nil {
+	// 	return err
+	// }
 
-	sheet := data.Sheet
-	spreadsheetID := data.SpreadsheetID
-	medicineSheets := data.MedicineSheets
-	medicineMapping := data.MedicineData
-	lockerID := data.LockerID
+	// sheet := data.Sheet
+	// spreadsheetID := data.SpreadsheetID
+	// medicineSheets := data.MedicineSheets
+	// medicineMapping := data.MedicineData
+	// lockerID := data.LockerID
 
-	columnIDIndex := 0
-	if s.isSyncUniqueByID {
-		columns, err := s.sheet.ReadColumns(ctx, sheet, option.WithGoogleSheetReadColumnIgnoreUserEnteredFormat(true))
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
-		}
+	// columnIDIndex := 0
+	// if s.isSyncUniqueByID {
+	// 	columns, err := s.sheet.ReadColumns(ctx, sheet, option.WithGoogleSheetReadColumnIgnoreUserEnteredFormat(true))
+	// 	if err != nil {
+	// 		logger.Context(ctx).Error(err)
+	// 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	// 	}
 
-		columnIDIndex = slices.IndexFunc(columns, func(column option.GoogleSheetUpdateColumn) bool {
-			return column.Value == "รหัส"
-		})
-		isFoundColumnID := columnIDIndex != -1
-		if !isFoundColumnID {
-			columnIDIndex = len(columns)
-			err = s.sheet.Update(
-				ctx,
-				spreadsheetID,
-				option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
-				option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
-				option.WithGoogleSheetUpdateColumns([]option.GoogleSheetUpdateColumn{{Value: "รหัส", Width: 500}}),
-				option.WithGoogleSheetUpdateColumnStartIndex(int64(columnIDIndex)+1),
-				option.WithGoogleSheetUpdateIsTextWraping(true),
-				option.WithGoogleSheetUpdateFontSize(20),
-			)
-			if err != nil {
-				logger.Context(ctx).Error(err)
-				return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-			}
-		}
-	}
+	// 	columnIDIndex = slices.IndexFunc(columns, func(column option.GoogleSheetUpdateColumn) bool {
+	// 		return column.Value == "รหัส"
+	// 	})
+	// 	isFoundColumnID := columnIDIndex != -1
+	// 	if !isFoundColumnID {
+	// 		columnIDIndex = len(columns)
+	// 		err = s.sheet.Update(
+	// 			ctx,
+	// 			spreadsheetID,
+	// 			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
+	// 			option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
+	// 			option.WithGoogleSheetUpdateColumns([]option.GoogleSheetUpdateColumn{{Value: "รหัส", Width: 500}}),
+	// 			option.WithGoogleSheetUpdateColumnStartIndex(int64(columnIDIndex)+1),
+	// 			option.WithGoogleSheetUpdateIsTextWraping(true),
+	// 			option.WithGoogleSheetUpdateFontSize(20),
+	// 		)
+	// 		if err != nil {
+	// 			logger.Context(ctx).Error(err)
+	// 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	// 		}
+	// 	}
+	// }
 
-	for index, medicineSheet := range medicineSheets {
-		locker, ok := lockerID[medicineSheet.LockerName]
-		if !ok {
-			lockerID[medicineSheet.LockerName], err = s.lockerRepository.CreateLocker(ctx, genmodel.PharmaSheetLockers{
-				WarehouseID: uuid.MustParse(req.WarehouseID),
-				Name:        medicineSheet.LockerName,
-			})
-			if err != nil {
-				logger.Context(ctx).Error(err)
-				return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-			}
-			locker = lockerID[medicineSheet.LockerName]
-		}
+	// for index, medicineSheet := range medicineSheets {
+	// 	locker, ok := lockerID[medicineSheet.LockerName]
+	// 	if !ok {
+	// 		lockerID[medicineSheet.LockerName], err = s.lockerRepository.CreateLocker(ctx, genmodel.PharmaSheetLockers{
+	// 			WarehouseID: uuid.MustParse(req.WarehouseID),
+	// 			Name:        medicineSheet.LockerName,
+	// 		})
+	// 		if err != nil {
+	// 			logger.Context(ctx).Error(err)
+	// 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	// 		}
+	// 		locker = lockerID[medicineSheet.LockerName]
+	// 	}
 
-		createData := model.CreateMedicineRequest{
-			WarehouseID: req.WarehouseID,
-			LockerID:    locker,
-			Floor:       medicineSheet.Floor,
-			No:          medicineSheet.No,
-			Address:     medicineSheet.Address,
-			Description: medicineSheet.Description,
-			MedicalName: medicineSheet.MedicalName,
-			Label:       medicineSheet.Label,
-		}
+	// 	createData := model.CreateMedicineRequest{
+	// 		WarehouseID: req.WarehouseID,
+	// 		LockerID:    locker,
+	// 		Floor:       medicineSheet.Floor,
+	// 		No:          medicineSheet.No,
+	// 		Address:     medicineSheet.Address,
+	// 		Description: medicineSheet.Description,
+	// 		MedicalName: medicineSheet.MedicalName,
+	// 		Label:       medicineSheet.Label,
+	// 	}
 
-		updateData := model.UpdateMedicineRequest{
-			MedicineID:  medicineSheet.MedicineID,
-			LockerID:    locker,
-			Floor:       medicineSheet.Floor,
-			No:          medicineSheet.No,
-			Address:     medicineSheet.Address,
-			Description: medicineSheet.Description,
-			MedicalName: medicineSheet.MedicalName,
-			Label:       medicineSheet.Label,
-		}
+	// 	updateData := model.UpdateMedicineRequest{
+	// 		MedicationID: medicineSheet.MedicationID,
+	// 		LockerID:     locker,
+	// 		Floor:        medicineSheet.Floor,
+	// 		No:           medicineSheet.No,
+	// 		Address:      medicineSheet.Address,
+	// 		Description:  medicineSheet.Description,
+	// 		MedicalName:  medicineSheet.MedicalName,
+	// 		Label:        medicineSheet.Label,
+	// 	}
 
-		key := medicineSheet.Address
-		if s.isSyncUniqueByID {
-			key = medicineSheet.MedicineID
-		}
+	// 	key := medicineSheet.Address
+	// 	if s.isSyncUniqueByID {
+	// 		key = medicineSheet.MedicationID
+	// 	}
 
-		medicine, ok := medicineMapping[key]
-		if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
-			continue
-		}
+	// 	medicine, ok := medicineMapping[key]
+	// 	if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
+	// 		continue
+	// 	}
 
-		if ok {
-			updateData.MedicineID = medicine.MedicineID
-			err = s.medicineRepository.UpdateMedicine(ctx, updateData)
-			if err != nil {
-				logger.Context(ctx).Error(err)
-			}
-			continue
-		}
+	// 	if ok {
+	// 		updateData.MedicationID = medicine.MedicationID
+	// 		err = s.medicineRepository.UpdateMedicine(ctx, updateData)
+	// 		if err != nil {
+	// 			logger.Context(ctx).Error(err)
+	// 		}
+	// 		continue
+	// 	}
 
-		medicineID, err := s.medicineRepository.CreateMedicine(ctx, createData)
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			continue
-		}
+	// 	medicationID, err := s.medicineRepository.CreateMedicine(ctx, createData)
+	// 	if err != nil {
+	// 		logger.Context(ctx).Error(err)
+	// 		continue
+	// 	}
 
-		if !s.isSyncUniqueByID {
-			continue
-		}
+	// 	if !s.isSyncUniqueByID {
+	// 		continue
+	// 	}
 
-		col, _ := excelize.ColumnNumberToName(columnIDIndex + 1)
-		err = s.sheet.Update(
-			ctx,
-			spreadsheetID,
-			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
-			option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
-			option.WithGoogleSheetUpdateData([][]option.GoogleSheetUpdateData{{{Value: medicineID}}}),
-			option.WithGoogleSheetUpdateIsTextWraping(true),
-			option.WithGoogleSheetUpdateFontSize(20),
-			option.WithGoogleSheetUpdateStartCellRange(fmt.Sprintf("%s%d", col, index+2)),
-		)
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-		}
-	}
-	return nil
+	// 	col, _ := excelize.ColumnNumberToName(columnIDIndex + 1)
+	// 	err = s.sheet.Update(
+	// 		ctx,
+	// 		spreadsheetID,
+	// 		option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
+	// 		option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
+	// 		option.WithGoogleSheetUpdateData([][]option.GoogleSheetUpdateData{{{Value: medicationID}}}),
+	// 		option.WithGoogleSheetUpdateIsTextWraping(true),
+	// 		option.WithGoogleSheetUpdateFontSize(20),
+	// 		option.WithGoogleSheetUpdateStartCellRange(fmt.Sprintf("%s%d", col, index+2)),
+	// 	)
+	// 	if err != nil {
+	// 		logger.Context(ctx).Error(err)
+	// 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	// 	}
+	// }
+	// return nil
 }
 
 func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedicineRequest, isUpdateWarehouseSheet bool) (data model.GoogleSheetData, err error) {
-	err = s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return data, err
-	}
+	panic("TODO: implement me!")
+	// err = s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
+	// if err != nil {
+	// 	logger.Context(ctx).Error(err)
+	// 	return data, err
+	// }
 
-	spreadsheetID, sheetID, err := extractSpreadsheetInfo(req.URL)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
-	}
+	// spreadsheetID, sheetID, err := extractSpreadsheetInfo(req.URL)
+	// if err != nil {
+	// 	logger.Context(ctx).Error(err)
+	// 	return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
+	// }
 
-	spreadsheet, err := s.sheet.Get(ctx, spreadsheetID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
-	}
+	// spreadsheet, err := s.sheet.Get(ctx, spreadsheetID)
+	// if err != nil {
+	// 	logger.Context(ctx).Error(err)
+	// 	return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
+	// }
 
-	var sheet *sheets.Sheet
-	for _, spreadSheet := range spreadsheet.Sheets {
-		if spreadSheet.Properties.SheetId == int64(sheetID) {
-			sheet = spreadSheet
-			break
-		}
-	}
-	if sheet == nil {
-		logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
-		return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "sheetID is not found"})
-	}
+	// var sheet *sheets.Sheet
+	// for _, spreadSheet := range spreadsheet.Sheets {
+	// 	if spreadSheet.Properties.SheetId == int64(sheetID) {
+	// 		sheet = spreadSheet
+	// 		break
+	// 	}
+	// }
+	// if sheet == nil {
+	// 	logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
+	// 	return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "sheetID is not found"})
+	// }
 
-	isConflict, err := s.warehouseRepository.CheckConflictWarehouseSheet(ctx, req.WarehouseID, spreadsheetID, sheetID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	if isConflict {
-		return data, echo.NewHTTPError(http.StatusConflict, echo.Map{"error": "sheet is already sync by another warehouse"})
-	}
+	// isConflict, err := s.warehouseRepository.CheckConflictWarehouseSheet(ctx, req.WarehouseID, spreadsheetID, sheetID)
+	// if err != nil {
+	// 	logger.Context(ctx).Error(err)
+	// 	return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	// }
+	// if isConflict {
+	// 	return data, echo.NewHTTPError(http.StatusConflict, echo.Map{"error": "sheet is already sync by another warehouse"})
+	// }
 
-	if isUpdateWarehouseSheet {
-		warehouseSheet := genmodel.PharmaSheetWarehouseSheets{
-			WarehouseID:   uuid.MustParse(req.WarehouseID),
-			SpreadsheetID: spreadsheetID,
-			SheetID:       sheetID,
-		}
-		err = s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
-		if err != nil {
-			logger.Context(ctx).Error(err)
-			return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-		}
-	}
+	// if isUpdateWarehouseSheet {
+	// 	warehouseSheet := genmodel.PharmaSheetWarehouseSheets{
+	// 		WarehouseID:   uuid.MustParse(req.WarehouseID),
+	// 		SpreadsheetID: spreadsheetID,
+	// 		SheetID:       sheetID,
+	// 	}
+	// 	err = s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
+	// 	if err != nil {
+	// 		logger.Context(ctx).Error(err)
+	// 		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	// 	}
+	// }
 
-	var medicineSheets []model.MedicineSheet
-	_, err = s.sheet.Read(ctx, sheet, &medicineSheets)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
+	// var medicineSheets []model.MedicineSheet
+	// _, err = s.sheet.Read(ctx, sheet, &medicineSheets)
+	// if err != nil {
+	// 	logger.Context(ctx).Error(err)
+	// 	return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	// }
 
-	lockers, err := s.lockerRepository.GetLockers(ctx, req.WarehouseID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	lockerID := make(map[string]string)
-	for _, locker := range lockers {
-		lockerID[locker.Name] = locker.LockerID.String()
-	}
+	// lockers, err := s.lockerRepository.GetLockers(ctx, req.WarehouseID)
+	// if err != nil {
+	// 	logger.Context(ctx).Error(err)
+	// 	return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	// }
+	// lockerID := make(map[string]string)
+	// for _, locker := range lockers {
+	// 	lockerID[locker.Name] = locker.LockerID.String()
+	// }
 
-	medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: req.WarehouseID})
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-	medicineMapping := make(map[string]model.Medicine)
-	for _, medicine := range medicines {
-		if s.isSyncUniqueByID {
-			medicineMapping[medicine.MedicineID] = medicine
-		} else {
-			medicineMapping[medicine.Address] = medicine
-		}
-	}
+	// medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: req.WarehouseID})
+	// if err != nil {
+	// 	logger.Context(ctx).Error(err)
+	// 	return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	// }
+	// medicineMapping := make(map[string]model.Medicine)
+	// for _, medicine := range medicines {
+	// 	if s.isSyncUniqueByID {
+	// 		medicineMapping[medicine.MedicationID] = medicine
+	// 	} else {
+	// 		medicineMapping[medicine.Address] = medicine
+	// 	}
+	// }
 
-	data = model.GoogleSheetData{
-		Sheet:            sheet,
-		SpreadsheetTitle: spreadsheet.Properties.Title,
-		SpreadsheetID:    spreadsheetID,
-		LockerID:         lockerID,
-		MedicineSheets:   medicineSheets,
-		MedicineData:     medicineMapping,
-	}
+	// data = model.GoogleSheetData{
+	// 	Sheet:            sheet,
+	// 	SpreadsheetTitle: spreadsheet.Properties.Title,
+	// 	SpreadsheetID:    spreadsheetID,
+	// 	LockerID:         lockerID,
+	// 	MedicineSheets:   medicineSheets,
+	// 	MedicineData:     medicineMapping,
+	// }
 
-	return data, nil
+	// return data, nil
 }
 
 func extractSpreadsheetInfo(url string) (string, int32, error) {

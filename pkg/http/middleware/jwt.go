@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
@@ -22,6 +23,12 @@ func NewProfileProvider(jwtSecret string, client *redis.Client, skipMethodURLs .
 
 			for _, skipMethodURL := range skipMethodURLs {
 				methodURL := req.Method + " " + req.URL.Path
+				if strings.HasSuffix(skipMethodURL, "*") {
+					skipMethodURL = skipMethodURL[:len(skipMethodURL)-1]
+					if strings.HasPrefix(methodURL, skipMethodURL) {
+						return next(c)
+					}
+				}
 				if skipMethodURL == methodURL {
 					return next(c)
 				}

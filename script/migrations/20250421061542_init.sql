@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_warehouse_users (
   status pharma_sheet_approval_status NOT NULL DEFAULT 'PENDING',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_warehouse_user_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id),
-  CONSTRAINT fk_warehouse_user_user_id FOREIGN KEY (user_id) REFERENCES pharma_sheet_users (user_id),
+  CONSTRAINT fk_warehouse_user_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id) ON DELETE CASCADE,
+  CONSTRAINT fk_warehouse_user_user_id FOREIGN KEY (user_id) REFERENCES pharma_sheet_users (user_id) ON DELETE CASCADE,
   CONSTRAINT unique_warehouse_user UNIQUE (warehouse_id, user_id)
 );
 
@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_medicine_blister_date_histories (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_medicine_blister_date_history_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id) ON DELETE CASCADE,
   CONSTRAINT fk_medicine_blister_date_history_medication_id FOREIGN KEY (medication_id) REFERENCES pharma_sheet_medicines (medication_id) ON DELETE CASCADE,
-  CONSTRAINT fk_medicine_blister_date_history_brand_id FOREIGN KEY (brand_id) REFERENCES pharma_sheet_medicine_brands (id) ON DELETE CASCADE
+  CONSTRAINT fk_medicine_blister_date_history_brand_id FOREIGN KEY (brand_id) REFERENCES pharma_sheet_medicine_brands (id) ON DELETE CASCADE,
+  CONSTRAINT unique_blister_date_history UNIQUE (warehouse_id, medication_id, brand_id, blister_change_date)
 );
 
 CREATE TABLE IF NOT EXISTS pharma_sheet_medicine_houses (
@@ -91,9 +92,13 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_warehouse_sheets (
   warehouse_id TEXT PRIMARY KEY,
   spreadsheet_id TEXT NOT NULL,
   medicine_sheet_id INT NOT NULL,
+  medicine_sheet_name TEXT NOT NULL,
   medicine_brand_sheet_id INT NOT NULL,
+  medicine_brand_sheet_name TEXT NOT NULL,
   medicine_house_sheet_id INT NOT NULL,
+  medicine_house_sheet_name TEXT NOT NULL,
   medicine_blister_date_history_sheet_id INT NOT NULL,
+  medicine_blister_date_history_sheet_name TEXT NOT NULL,
   latest_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id) ON DELETE CASCADE,

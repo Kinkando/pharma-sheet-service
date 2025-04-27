@@ -16,17 +16,15 @@ const (
 )
 
 type Warehouse struct {
-	WarehouseID    string     `json:"warehouseID"`
-	Name           string     `json:"warehouseName"`
-	Role           string     `json:"role"`
-	Lockers        []Locker   `json:"lockers"`
-	SheetURL       *string    `json:"sheetURL,omitempty"`
-	LatestSyncedAt *time.Time `json:"latestSyncedAt,omitempty"`
-}
-
-type Locker struct {
-	LockerID   string `json:"lockerID"`
-	LockerName string `json:"lockerName"`
+	WarehouseID                         string     `json:"warehouseID"`
+	Name                                string     `json:"warehouseName"`
+	Role                                string     `json:"role"`
+	SheetURL                            *string    `json:"sheetURL,omitempty"`
+	MedicineSheetName                   *string    `json:"medicineSheetName,omitempty"`
+	MedicineHouseSheetName              *string    `json:"medicineHouseSheetName,omitempty"`
+	MedicineBrandSheetName              *string    `json:"medicineBrandSheetName,omitempty"`
+	MedicineBlisterDateHistorySheetName *string    `json:"medicineBlisterDateHistorySheetName,omitempty"`
+	LatestSyncedAt                      *time.Time `json:"latestSyncedAt,omitempty"`
 }
 
 type FilterWarehouseDetail struct {
@@ -41,75 +39,52 @@ type WarehouseDetail struct {
 	Name          string                           `json:"warehouseName"`
 	Role          *string                          `json:"role,omitempty"`
 	Status        *model.PharmaSheetApprovalStatus `json:"status,omitempty"`
-	LockerDetails []LockerDetail                   `json:"lockerDetails"`
-	TotalLocker   uint64                           `json:"totalLocker"`
 	TotalMedicine uint64                           `json:"totalMedicine"`
 	Users         []WarehouseUser                  `json:"users,omitempty"`
 }
 
-type LockerDetail struct {
-	LockerID      string `json:"lockerID"`
-	LockerName    string `json:"lockerName"`
-	TotalMedicine uint64 `json:"totalMedicine"`
-}
-
 type CreateWarehouseRequest struct {
+	WarehouseID   string `param:"warehouseID" validate:"required"`
 	WarehouseName string `json:"warehouseName" validate:"required"`
 }
 
 type UpdateWarehouseRequest struct {
-	WarehouseID   string `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID   string `param:"warehouseID" validate:"required"`
 	WarehouseName string `json:"warehouseName" validate:"required"`
-}
-
-type CreateWarehouseLockerRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
-	LockerName  string `json:"lockerName" validate:"required"`
-}
-
-type UpdateWarehouseLockerRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
-	LockerID    string `param:"lockerID" validate:"required,uuid"`
-	LockerName  string `json:"lockerName" validate:"required"`
-}
-
-type DeleteWarehouseLockerRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
-	LockerID    string `param:"lockerID" validate:"required,uuid"`
 }
 
 type FilterWarehouseUser struct {
 	Pagination
-	WarehouseID string                          `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string                          `param:"warehouseID" validate:"required"`
 	Search      string                          `query:"search"`
 	Status      model.PharmaSheetApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
 	Role        model.PharmaSheetRole           `query:"role" validate:"omitempty,oneof=ADMIN EDITOR VIEWER"`
 }
 
 type CreateWarehouseUserRequest struct {
-	WarehouseID string                `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string                `param:"warehouseID" validate:"required"`
 	Email       string                `json:"email" validate:"required,email"`
 	Role        model.PharmaSheetRole `json:"role" validate:"required,oneof=ADMIN EDITOR VIEWER"`
 }
 
 type UpdateWarehouseUserRequest struct {
-	WarehouseID string                `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string                `param:"warehouseID" validate:"required"`
 	UserID      string                `param:"userID" validate:"required,uuid"`
 	Role        model.PharmaSheetRole `param:"role" validate:"required,oneof=ADMIN EDITOR VIEWER"`
 }
 
 type DeleteWarehouseUserRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string `param:"warehouseID" validate:"required"`
 	UserID      string `param:"userID" validate:"required,uuid"`
 }
 
 type ApprovalWarehouseUserRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string `param:"warehouseID" validate:"required"`
 	UserID      string `param:"userID" validate:"required,uuid"`
 }
 
 type WarehouseRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string `param:"warehouseID" validate:"required"`
 }
 
 type CountWarehouseUserStatus struct {
@@ -123,18 +98,13 @@ type WarehouseUser struct {
 	Status model.PharmaSheetApprovalStatus `json:"status"`
 }
 
-type DeleteLockerFilter struct {
-	LockerID    string
-	WarehouseID string
-}
-
 type GetSyncMedicineMetadataRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string `param:"warehouseID" validate:"required"`
 	URL         string `query:"url" validate:"required,url"`
 }
 
 type SyncMedicineRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required,uuid"`
+	WarehouseID string `param:"warehouseID" validate:"required"`
 	URL         string `json:"url" validate:"required,url"`
 }
 
