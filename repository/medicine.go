@@ -17,7 +17,6 @@ import (
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
-	"github.com/kinkando/pharma-sheet-service/pkg/util"
 	"github.com/sourcegraph/conc/pool"
 )
 
@@ -25,6 +24,7 @@ type Medicine interface {
 	GetMedicineRole(ctx context.Context, medicationID, userID string) (genmodel.PharmaSheetRole, error)
 	GetMedicine(ctx context.Context, medicationID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error)
+	GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.Medicine, total uint64, err error)
 	ListMedicines(ctx context.Context, filter model.ListMedicine) ([]model.Medicine, error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicationID string, err error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
@@ -338,22 +338,20 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 
 	if search := strings.TrimSpace(filter.Search); search != "" {
 		search := postgres.String("%" + strings.ToLower(search) + "%")
+		address := postgres.CONCAT(table.PharmaSheetMedicineHouses.Locker, postgres.String("-"), table.PharmaSheetMedicineHouses.Floor, postgres.String("-"), table.PharmaSheetMedicineHouses.No)
 		condition = condition.AND(
 			postgres.OR(
+				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeID).LIKE(search),
 				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeName).LIKE(search),
 				postgres.LOWER(table.PharmaSheetMedicines.MedicalName).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicines.MedicationID).LIKE(search),
 				postgres.LOWER(table.PharmaSheetMedicineHouses.Label).LIKE(search),
+				postgres.LOWER(address).LIKE(search),
 			),
 		)
 	}
 
-	sortBy := "medical_name ASC"
-	if sorts := strings.Split(*filter.Sort, " "); filter.Sort != nil && *filter.Sort != "" && len(sorts) == 2 {
-		sortBy = util.CamelToSnake(strings.ReplaceAll(sorts[0], "ID", "Id")) + " " + sorts[1]
-	}
-	if !strings.HasSuffix(strings.ToUpper(sortBy), " ASC") && !strings.HasSuffix(strings.ToUpper(sortBy), " DESC") {
-		sortBy = strings.Split(*filter.Sort, " ")[0] + " ASC"
-	}
+	sortBy := filter.SortBy("medical_name ASC")
 	sorts := strings.Split(sortBy, " ")
 	order := sorts[1]
 	switch sorts[0] {
@@ -463,6 +461,115 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 	}
 
 	return sortedData, total, nil
+}
+
+func (r *medicine) GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.Medicine, total uint64, err error) {
+	sortBy := filter.SortBy(table.PharmaSheetMedicines.TableName() + ".medication_id ASC")
+
+	condition := postgres.Bool(true)
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		search := postgres.String("%" + strings.ToLower(search) + "%")
+		condition = condition.AND(
+			postgres.OR(
+				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeID).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeName).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicines.MedicalName).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicines.MedicationID).LIKE(search),
+			),
+		)
+	}
+
+	query, args := table.PharmaSheetMedicines.
+		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicines.MedicationID.EQ(table.PharmaSheetMedicineBrands.MedicationID)).
+		SELECT(postgres.COUNT(postgres.DISTINCT(table.PharmaSheetMedicines.MedicationID)).AS("total")).
+		WHERE(condition).
+		Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&total)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	if total == 0 {
+		return
+	}
+
+	query, args = table.PharmaSheetMedicines.
+		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicines.MedicationID.EQ(table.PharmaSheetMedicineBrands.MedicationID)).
+		SELECT(table.PharmaSheetMedicines.MedicationID, table.PharmaSheetMedicines.MedicalName).
+		WHERE(condition).
+		GROUP_BY(table.PharmaSheetMedicines.MedicationID, table.PharmaSheetMedicines.MedicalName).
+		LIMIT(int64(filter.Limit)).
+		OFFSET(int64(filter.Offset)).
+		ORDER_BY(postgres.Raw(sortBy)).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var medicationIDs []postgres.Expression
+	for rows.Next() {
+		var medicine model.Medicine
+		err = rows.Scan(&medicine.MedicationID, &medicine.MedicalName)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, 0, err
+		}
+		data = append(data, medicine)
+		medicationIDs = append(medicationIDs, postgres.String(medicine.MedicationID))
+	}
+
+	if len(data) > 0 {
+		query, args = table.PharmaSheetMedicineBrands.
+			SELECT(
+				table.PharmaSheetMedicineBrands.ID,
+				table.PharmaSheetMedicineBrands.MedicationID,
+				table.PharmaSheetMedicineBrands.TradeID,
+				table.PharmaSheetMedicineBrands.TradeName,
+				table.PharmaSheetMedicineBrands.BlisterImageURL,
+				table.PharmaSheetMedicineBrands.TabletImageURL,
+				table.PharmaSheetMedicineBrands.BoxImageURL,
+			).
+			WHERE(table.PharmaSheetMedicineBrands.MedicationID.IN(medicationIDs...)).
+			ORDER_BY(table.PharmaSheetMedicineBrands.TradeID).
+			Sql()
+
+		rows, err := r.pgPool.Query(ctx, query, args...)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, 0, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var medicineBrand model.MedicineBrand
+			err = rows.Scan(
+				&medicineBrand.ID,
+				&medicineBrand.MedicationID,
+				&medicineBrand.TradeID,
+				&medicineBrand.TradeName,
+				&medicineBrand.BlisterImageURL,
+				&medicineBrand.TabletImageURL,
+				&medicineBrand.BoxImageURL,
+			)
+			if err != nil {
+				logger.Context(ctx).Error(err)
+				return nil, 0, err
+			}
+			for index := range data {
+				if data[index].MedicationID == medicineBrand.MedicationID {
+					data[index].Brands = append(data[index].Brands, medicineBrand)
+					break
+				}
+			}
+		}
+	}
+
+	return
 }
 
 func (r *medicine) ListMedicines(ctx context.Context, filter model.ListMedicine) (data []model.Medicine, err error) {

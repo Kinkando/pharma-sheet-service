@@ -23,6 +23,9 @@ type MedicineBrand struct {
 	BlisterImageURL *string   `json:"blisterImageURL,omitempty"`
 	TabletImageURL  *string   `json:"tabletImageURL,omitempty"`
 	BoxImageURL     *string   `json:"boxImageURL,omitempty"`
+
+	// JOIN ONLY
+	MedicalName *string `json:"medicalName,omitempty"`
 }
 
 type MedicineHouse struct {
@@ -114,6 +117,11 @@ type FilterMedicineBrand struct {
 	MedicationID string
 	WarehouseID  string
 	BrandID      uuid.UUID
+}
+
+type FilterMedicineWithBrand struct {
+	Pagination
+	Search string `json:"-" query:"search"`
 }
 
 type CreateMedicineRequest struct {
