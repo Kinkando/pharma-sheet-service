@@ -153,11 +153,12 @@ type CreateMedicineHouseRequest struct {
 }
 
 type UpdateMedicineHouseRequest struct {
-	ID     uuid.UUID `param:"id" validate:"required,uuid"`
-	Locker string    `json:"locker" validate:"required"`
-	Floor  int32     `json:"floor" validate:"omitempty,min=1"`
-	No     int32     `json:"no" validate:"omitempty,min=1"`
-	Label  *string   `json:"label"`
+	ID           uuid.UUID `param:"id" validate:"required,uuid"`
+	MedicationID string    `json:"medicationID" validate:"required"`
+	Locker       string    `json:"locker" validate:"required"`
+	Floor        int32     `json:"floor" validate:"omitempty,min=1"`
+	No           int32     `json:"no" validate:"omitempty,min=1"`
+	Label        *string   `json:"label"`
 }
 
 type DeleteMedicineHouseRequest struct {

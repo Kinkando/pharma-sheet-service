@@ -25,6 +25,7 @@ type Medicine interface {
 	GetMedicine(ctx context.Context, medicationID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error)
 	ListMedicines(ctx context.Context, filter model.ListMedicine) ([]model.Medicine, error)
+	ListMedicinesMaster(ctx context.Context) ([]model.Medicine, error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicationID string, err error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
 	DeleteMedicine(ctx context.Context, filter model.DeleteMedicineFilter) (int64, error)
@@ -515,6 +516,33 @@ func (r *medicine) ListMedicines(ctx context.Context, filter model.ListMedicine)
 	return data, nil
 }
 
+func (r *medicine) ListMedicinesMaster(ctx context.Context) ([]model.Medicine, error) {
+	query, args := table.PharmaSheetMedicines.
+		SELECT(table.PharmaSheetMedicines.MedicationID, table.PharmaSheetMedicines.MedicalName).
+		ORDER_BY(table.PharmaSheetMedicines.MedicationID.ASC()).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var medicines []model.Medicine
+	for rows.Next() {
+		var medicine model.Medicine
+		err = rows.Scan(&medicine.MedicationID, &medicine.MedicalName)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, err
+		}
+		medicines = append(medicines, medicine)
+	}
+
+	return medicines, nil
+}
+
 func (r *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicationID string, err error) {
 	medicines := table.PharmaSheetMedicines
 
@@ -797,6 +825,7 @@ func (r *medicine) UpdateMedicineHouse(ctx context.Context, req model.UpdateMedi
 	medicineHouses := table.PharmaSheetMedicineHouses
 	sql, args := medicineHouses.
 		UPDATE(
+			medicineHouses.MedicationID,
 			medicineHouses.Locker,
 			medicineHouses.Floor,
 			medicineHouses.No,
@@ -804,6 +833,7 @@ func (r *medicine) UpdateMedicineHouse(ctx context.Context, req model.UpdateMedi
 			medicineHouses.UpdatedAt,
 		).
 		SET(
+			postgres.String(req.MedicationID),
 			postgres.String(req.Locker),
 			postgres.Int32(req.Floor),
 			postgres.Int32(req.No),
@@ -906,6 +936,12 @@ func (r *medicine) GetMedicineBrands(ctx context.Context, req model.FilterMedici
 
 func (r *medicine) GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.Medicine, total uint64, err error) {
 	sortBy := filter.SortBy(table.PharmaSheetMedicines.TableName() + ".medication_id ASC")
+	sorts := strings.Split(sortBy, " ")
+	order := sorts[1]
+	switch sorts[0] {
+	case "medication_id":
+		sortBy = fmt.Sprintf("%s.medication_id %s", table.PharmaSheetMedicines.TableName(), order)
+	}
 
 	condition := postgres.Bool(true)
 	if search := strings.TrimSpace(filter.Search); search != "" {

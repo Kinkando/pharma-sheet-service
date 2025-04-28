@@ -26,6 +26,7 @@ const (
 type Medicine interface {
 	GetMedicine(ctx context.Context, medicationID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (model.PagingWithMetadata[model.Medicine], error)
+	ListMedicinesMaster(ctx context.Context) ([]model.Medicine, error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (string, error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
 	DeleteMedicine(ctx context.Context, medicationID string) error
@@ -91,19 +92,13 @@ func (s *medicine) GetMedicine(ctx context.Context, medicationID string) (model.
 	return data, nil
 }
 
-func (s *medicine) GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (res model.PagingWithMetadata[model.Medicine], err error) {
-	data, total, err := s.medicineRepository.GetMedicineWithBrands(ctx, filter)
+func (s *medicine) ListMedicinesMaster(ctx context.Context) ([]model.Medicine, error) {
+	medicines, err := s.medicineRepository.ListMedicinesMaster(ctx)
 	if err != nil {
 		logger.Context(ctx).Error(err)
-		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
-
-	for index := range data {
-		data[index] = s.injectMedicineImageURL(ctx, data[index])
-	}
-
-	res = model.PaginationResponse(data, filter.Pagination, total)
-	return res, nil
+	return medicines, nil
 }
 
 func (s *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (string, error) {
@@ -237,6 +232,9 @@ func (s *medicine) UpdateMedicineHouse(ctx context.Context, req model.UpdateMedi
 
 	err = s.medicineRepository.UpdateMedicineHouse(ctx, req)
 	if err != nil {
+		if model.IsConflictError(err) {
+			return echo.NewHTTPError(http.StatusConflict, echo.Map{"error": err.Error()})
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 	return nil
@@ -268,6 +266,21 @@ func (s *medicine) DeleteMedicineHouse(ctx context.Context, id uuid.UUID) (int64
 		return 0, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "houseID is not found"})
 	}
 	return rowsAffected, nil
+}
+
+func (s *medicine) GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (res model.PagingWithMetadata[model.Medicine], err error) {
+	data, total, err := s.medicineRepository.GetMedicineWithBrands(ctx, filter)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	for index := range data {
+		data[index] = s.injectMedicineImageURL(ctx, data[index])
+	}
+
+	res = model.PaginationResponse(data, filter.Pagination, total)
+	return res, nil
 }
 
 func (s *medicine) CreateMedicineBrand(ctx context.Context, req model.CreateMedicineBrandRequest) (string, error) {

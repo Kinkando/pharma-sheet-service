@@ -24,6 +24,7 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 
 	route := e.Group("/medicine")
 	route.GET("", handler.getMedicines)
+	route.GET("/master/all", handler.getAllMedicines)
 	route.GET("/:medicationID", handler.getMedicine)
 	route.POST("/:medicationID", handler.createMedicine)
 	route.PATCH("/:medicationID", handler.updateMedicine)
@@ -62,6 +63,17 @@ func (h *MedicineHandler) getMedicines(c echo.Context) error {
 	}
 
 	data, err := h.medicineService.GetMedicines(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (h *MedicineHandler) getAllMedicines(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	data, err := h.medicineService.ListMedicinesMaster(ctx)
 	if err != nil {
 		return err
 	}
