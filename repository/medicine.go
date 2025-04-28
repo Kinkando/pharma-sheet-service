@@ -16,6 +16,7 @@ import (
 	"github.com/kinkando/pharma-sheet-service/model"
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
+	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/pkg/util"
 	"github.com/sourcegraph/conc/pool"
 )
@@ -61,7 +62,8 @@ func (r *medicine) GetMedicineRole(ctx context.Context, medicationID, userID str
 			table.PharmaSheetMedicines.MedicationID.EQ(postgres.String(medicationID)).AND(
 				table.PharmaSheetWarehouseUsers.Role.IS_NULL().OR(
 					table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(
-						table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved)),
+						table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved),
+					),
 				),
 			),
 		).
@@ -84,6 +86,11 @@ func (r *medicine) GetMedicineRole(ctx context.Context, medicationID, userID str
 }
 
 func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medicine model.Medicine, err error) {
+	userProfile, err := profile.UseProfile(ctx)
+	if err != nil {
+		return
+	}
+
 	query, args := table.PharmaSheetMedicines.
 		SELECT(table.PharmaSheetMedicines.MedicationID, table.PharmaSheetMedicines.MedicalName).
 		WHERE(table.PharmaSheetMedicines.MedicationID.EQ(postgres.String(medicationID))).
@@ -96,6 +103,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 
 	query, args = table.PharmaSheetMedicineHouses.
 		INNER_JOIN(table.PharmaSheetWarehouses, table.PharmaSheetMedicineHouses.WarehouseID.EQ(table.PharmaSheetWarehouses.WarehouseID)).
+		INNER_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetMedicineHouses.WarehouseID.EQ(table.PharmaSheetWarehouseUsers.WarehouseID)).
 		SELECT(
 			table.PharmaSheetMedicineHouses.ID,
 			table.PharmaSheetMedicineHouses.WarehouseID,
@@ -106,7 +114,9 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 			table.PharmaSheetMedicineHouses.Label,
 			table.PharmaSheetWarehouses.Name,
 		).
-		WHERE(table.PharmaSheetMedicineHouses.MedicationID.EQ(postgres.String(medicationID))).
+		WHERE(table.PharmaSheetMedicineHouses.MedicationID.EQ(postgres.String(medicationID)).AND(
+			table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved)),
+		)).
 		ORDER_BY(table.PharmaSheetWarehouses.WarehouseID.ASC(), table.PharmaSheetMedicineHouses.Locker.ASC(), table.PharmaSheetMedicineHouses.Floor.ASC(), table.PharmaSheetMedicineHouses.No.ASC()).
 		Sql()
 	rows, err := r.pgPool.Query(ctx, query, args...)
@@ -177,6 +187,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 
 	query, args = table.PharmaSheetMedicineBlisterDateHistories.
 		INNER_JOIN(table.PharmaSheetWarehouses, table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(table.PharmaSheetWarehouses.WarehouseID)).
+		INNER_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(table.PharmaSheetWarehouseUsers.WarehouseID)).
 		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(table.PharmaSheetMedicineBrands.ID)).
 		SELECT(
 			table.PharmaSheetMedicineBlisterDateHistories.ID,
@@ -188,7 +199,9 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 			table.PharmaSheetWarehouses.Name,
 			table.PharmaSheetMedicineBrands.TradeName,
 		).
-		WHERE(table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(medicationID))).
+		WHERE(table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(medicationID)).AND(
+			table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userProfile.UserID))).AND(table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved)),
+		)).
 		ORDER_BY(table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.ASC(), table.PharmaSheetMedicineBrands.TradeID.ASC(), table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate.ASC()).
 		Sql()
 	rows, err = r.pgPool.Query(ctx, query, args...)
@@ -303,7 +316,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine) (sortedData []model.Medicine, total uint64, err error) {
 	condition := postgres.Bool(true)
 	if filter.WarehouseID != "" {
-		condition = condition.AND(table.PharmaSheetMedicineHouses.WarehouseID.EQ(postgres.String(filter.WarehouseID)))
+		condition = condition.AND(table.PharmaSheetMedicineHouses.ID.IS_NOT_NULL().AND(table.PharmaSheetMedicineHouses.WarehouseID.EQ(postgres.String(filter.WarehouseID))))
 	}
 
 	if search := strings.TrimSpace(filter.Search); search != "" {
