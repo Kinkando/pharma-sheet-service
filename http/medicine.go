@@ -22,9 +22,6 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 		validate:        validate,
 	}
 
-	masterRoute := e.Group("/master")
-	masterRoute.GET("/medicine", handler.getMedicineWithBrands)
-
 	route := e.Group("/medicine")
 	route.GET("", handler.getMedicines)
 	route.GET("/:medicationID", handler.getMedicine)
@@ -33,11 +30,13 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 	route.DELETE("/:medicationID", handler.deleteMedicine)
 
 	houseRoute := e.Group("/house")
+	houseRoute.GET("", handler.getMedicineHouses)
 	houseRoute.POST("", handler.createMedicineHouse)
 	houseRoute.PUT("/:id", handler.updateMedicineHouse)
 	houseRoute.DELETE("/:id", handler.deleteMedicineHouse)
 
 	brandRoute := e.Group("/brand")
+	brandRoute.GET("", handler.getMedicineWithBrands)
 	brandRoute.POST("", handler.createMedicineBrand)
 	brandRoute.PUT("/:id", handler.updateMedicineBrand)
 	brandRoute.DELETE("/:id", handler.deleteMedicineBrand)
@@ -63,29 +62,6 @@ func (h *MedicineHandler) getMedicines(c echo.Context) error {
 	}
 
 	data, err := h.medicineService.GetMedicines(ctx, req)
-	if err != nil {
-		return err
-	}
-
-	return c.JSON(http.StatusOK, data)
-}
-
-func (h *MedicineHandler) getMedicineWithBrands(c echo.Context) error {
-	ctx := c.Request().Context()
-
-	var req model.FilterMedicineWithBrand
-	if err := c.Bind(&req); err != nil {
-		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
-	req.Pagination.AssignDefault()
-
-	if err := h.validate.Struct(req); err != nil {
-		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
-
-	data, err := h.medicineService.GetMedicineWithBrands(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -164,6 +140,29 @@ func (h *MedicineHandler) deleteMedicine(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *MedicineHandler) getMedicineHouses(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.ListMedicineHouse
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+	req.Pagination.AssignDefault()
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	data, err := h.medicineService.GetMedicineHouses(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
 func (h *MedicineHandler) createMedicineHouse(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -225,6 +224,29 @@ func (h *MedicineHandler) deleteMedicineHouse(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *MedicineHandler) getMedicineWithBrands(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.FilterMedicineWithBrand
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+	req.Pagination.AssignDefault()
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	data, err := h.medicineService.GetMedicineWithBrands(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, data)
 }
 
 func (h *MedicineHandler) createMedicineBrand(c echo.Context) error {

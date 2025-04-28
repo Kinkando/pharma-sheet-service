@@ -31,7 +31,7 @@ type MedicineBrand struct {
 type MedicineHouse struct {
 	ID           uuid.UUID `json:"id"`
 	MedicationID string    `json:"medicationID,omitempty"`
-	WarehouseID  string    `json:"warehouseID"`
+	WarehouseID  string    `json:"warehouseID,omitempty"`
 	Locker       string    `json:"locker"`
 	Floor        int32     `json:"floor"`
 	No           int32     `json:"no"`
@@ -39,6 +39,7 @@ type MedicineHouse struct {
 
 	// JOIN ONLY
 	WarehouseName *string `json:"warehouseName,omitempty"`
+	MedicalName   *string `json:"medicalName,omitempty"`
 }
 
 type MedicineBlisterDateHistory struct {
@@ -100,11 +101,15 @@ type MedicineBrandBlisterDateDetailHistoryView struct {
 type FilterMedicine struct {
 	Pagination
 	WarehouseID string `json:"-" query:"warehouseID"`
-	Search      string `json:"-" query:"search"`
 }
 
 type ListMedicine struct {
 	WarehouseID string
+}
+
+type ListMedicineHouse struct {
+	Pagination
+	WarehouseID string `json:"-" query:"warehouseID" validate:"required"`
 }
 
 type FilterMedicineHouse struct {
@@ -121,7 +126,6 @@ type FilterMedicineBrand struct {
 
 type FilterMedicineWithBrand struct {
 	Pagination
-	Search string `json:"-" query:"search"`
 }
 
 type CreateMedicineRequest struct {

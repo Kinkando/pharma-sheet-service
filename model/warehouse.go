@@ -29,7 +29,6 @@ type Warehouse struct {
 
 type FilterWarehouseDetail struct {
 	Pagination
-	Search string                          `query:"search"`
 	Status model.PharmaSheetApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
 	Group  WarehouseGroup                  `query:"group" validate:"omitempty,oneof=MY_WAREHOUSE OTHER_WAREHOUSE OTHER_WAREHOUSE_PENDING"`
 }
@@ -56,7 +55,6 @@ type UpdateWarehouseRequest struct {
 type FilterWarehouseUser struct {
 	Pagination
 	WarehouseID string                          `param:"warehouseID" validate:"required"`
-	Search      string                          `query:"search"`
 	Status      model.PharmaSheetApprovalStatus `query:"status" validate:"omitempty,oneof=APPROVED PENDING"`
 	Role        model.PharmaSheetRole           `query:"role" validate:"omitempty,oneof=ADMIN EDITOR VIEWER"`
 }

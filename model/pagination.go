@@ -12,6 +12,7 @@ type Pagination struct {
 	Offset uint64  `json:"offset" query:"offset"`
 	Page   uint64  `json:"page" query:"page"`
 	Sort   *string `json:"sort" query:"sort"`
+	Search string  `json:"-" query:"search"`
 }
 
 func (p *Pagination) AssignDefault() {

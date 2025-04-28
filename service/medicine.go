@@ -26,15 +26,16 @@ const (
 type Medicine interface {
 	GetMedicine(ctx context.Context, medicationID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (model.PagingWithMetadata[model.Medicine], error)
-	GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (model.PagingWithMetadata[model.Medicine], error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (string, error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
 	DeleteMedicine(ctx context.Context, medicationID string) error
 
+	GetMedicineHouses(ctx context.Context, filter model.ListMedicineHouse) (model.PagingWithMetadata[model.MedicineHouse], error)
 	CreateMedicineHouse(ctx context.Context, req model.CreateMedicineHouseRequest) (string, error)
 	UpdateMedicineHouse(ctx context.Context, req model.UpdateMedicineHouseRequest) error
 	DeleteMedicineHouse(ctx context.Context, id uuid.UUID) (int64, error)
 
+	GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (model.PagingWithMetadata[model.Medicine], error)
 	CreateMedicineBrand(ctx context.Context, req model.CreateMedicineBrandRequest) (string, error)
 	UpdateMedicineBrand(ctx context.Context, req model.UpdateMedicineBrandRequest) error
 	DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64, error)
@@ -189,6 +190,16 @@ func (s *medicine) DeleteMedicine(ctx context.Context, medicationID string) erro
 		return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicationID is not found"})
 	}
 	return nil
+}
+
+func (s *medicine) GetMedicineHouses(ctx context.Context, filter model.ListMedicineHouse) (model.PagingWithMetadata[model.MedicineHouse], error) {
+	houses, total, err := s.medicineRepository.ListMedicineHouses(ctx, filter)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return model.PagingWithMetadata[model.MedicineHouse]{}, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	res := model.PaginationResponse(houses, filter.Pagination, total)
+	return res, nil
 }
 
 func (s *medicine) CreateMedicineHouse(ctx context.Context, req model.CreateMedicineHouseRequest) (string, error) {
