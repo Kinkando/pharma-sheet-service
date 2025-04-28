@@ -157,40 +157,7 @@ func (s *warehouse) DeleteWarehouse(ctx context.Context, warehouseID string, byp
 		}
 	}
 
-	medicineBrands, err := s.medicineRepository.GetMedicineBrands(ctx, model.FilterMedicineBrand{WarehouseID: warehouseID})
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
-	}
-
-	deleteFile := func(ctx context.Context, fileID string) func(ctx context.Context) error {
-		err = s.drive.Delete(ctx, fileID)
-		if err != nil {
-			logger.Context(ctx).Warn(err)
-		}
-		return nil
-	}
-
-	if len(medicineBrands) > 0 {
-		conc := pool.New().WithContext(ctx).WithMaxGoroutines(5).WithCancelOnError()
-		for _, brand := range medicineBrands {
-			brand := brand
-			if brand.BlisterImageURL != nil {
-				conc.Go(deleteFile(ctx, *brand.BlisterImageURL))
-			}
-			if brand.BoxImageURL != nil {
-				conc.Go(deleteFile(ctx, *brand.BoxImageURL))
-			}
-			if brand.TabletImageURL != nil {
-				conc.Go(deleteFile(ctx, *brand.TabletImageURL))
-			}
-		}
-		if err = conc.Wait(); err != nil {
-			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicine is not found"})
-		}
-	}
-
-	err = s.warehouseRepository.DeleteWarehouse(ctx, warehouseID)
+	err := s.warehouseRepository.DeleteWarehouse(ctx, warehouseID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": err.Error()})

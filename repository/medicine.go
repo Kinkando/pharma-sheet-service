@@ -41,6 +41,7 @@ type Medicine interface {
 	DeleteMedicineBrand(ctx context.Context, filter model.DeleteMedicineBrandFilter) (int64, error)
 
 	GetMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) (model.MedicineBlisterDateHistory, error)
+	ListMedicineBlisterChangeDateHistory(ctx context.Context, filter model.FilterMedicineBrandBlisterDateHistory) ([]model.MedicineBlisterDateHistory, error)
 	CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error)
 	DeleteMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) error
 }
@@ -57,32 +58,48 @@ func (r *medicine) GetMedicineRole(ctx context.Context, medicationID, userID str
 	query, args := table.PharmaSheetMedicines.
 		LEFT_JOIN(table.PharmaSheetMedicineHouses, table.PharmaSheetMedicineHouses.MedicationID.EQ(table.PharmaSheetMedicines.MedicationID)).
 		LEFT_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetWarehouseUsers.WarehouseID.EQ(table.PharmaSheetMedicineHouses.WarehouseID)).
-		SELECT(table.PharmaSheetWarehouseUsers.Role).
-		WHERE(
-			table.PharmaSheetMedicines.MedicationID.EQ(postgres.String(medicationID)).AND(
-				table.PharmaSheetWarehouseUsers.Role.IS_NULL().OR(
-					table.PharmaSheetWarehouseUsers.UserID.EQ(postgres.UUID(uuid.MustParse(userID))).AND(
-						table.PharmaSheetWarehouseUsers.Status.EQ(enum.PharmaSheetApprovalStatus.Approved),
-					),
-				),
-			),
-		).
+		SELECT(table.PharmaSheetWarehouseUsers.UserID, table.PharmaSheetWarehouseUsers.Role, table.PharmaSheetWarehouseUsers.Status).
+		WHERE(table.PharmaSheetMedicines.MedicationID.EQ(postgres.String(medicationID))).
+		GROUP_BY(table.PharmaSheetWarehouseUsers.UserID, table.PharmaSheetWarehouseUsers.Role, table.PharmaSheetWarehouseUsers.Status).
 		Sql()
 
-	var assignedRole *genmodel.PharmaSheetRole
-	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&assignedRole)
+	rows, err := r.pgPool.Query(ctx, query, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return
 	}
+	defer rows.Close()
 
-	if assignedRole == nil {
-		role = genmodel.PharmaSheetRole_Admin
-	} else {
-		role = *assignedRole
+	var warehouseUsers []genmodel.PharmaSheetWarehouseUsers
+	for rows.Next() {
+		var userID *uuid.UUID
+		var userRole *genmodel.PharmaSheetRole
+		var status *genmodel.PharmaSheetApprovalStatus
+		if err = rows.Scan(&userID, &userRole, &status); err != nil {
+			logger.Context(ctx).Error(err)
+			return
+		}
+
+		if userID != nil && userRole != nil && status != nil {
+			warehouseUsers = append(warehouseUsers, genmodel.PharmaSheetWarehouseUsers{
+				UserID: *userID,
+				Role:   *userRole,
+				Status: *status,
+			})
+		}
 	}
 
-	return role, nil
+	if len(warehouseUsers) == 0 {
+		return genmodel.PharmaSheetRole_Admin, nil
+	}
+
+	for _, warehouseUser := range warehouseUsers {
+		if warehouseUser.UserID.String() == userID && warehouseUser.Status == genmodel.PharmaSheetApprovalStatus_Approved {
+			return warehouseUser.Role, nil
+		}
+	}
+
+	return role, model.ErrResourceNotAllowed
 }
 
 func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medicine model.Medicine, err error) {
@@ -922,6 +939,59 @@ func (r *medicine) GetMedicineBlisterChangeDateHistory(ctx context.Context, id u
 	}
 
 	return medicineBlisterDateHistory, nil
+}
+
+func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, filter model.FilterMedicineBrandBlisterDateHistory) ([]model.MedicineBlisterDateHistory, error) {
+	condition := postgres.Bool(true)
+	validCondition := false
+	if filter.MedicationID != nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(*filter.MedicationID)))
+		validCondition = true
+	}
+	if filter.BrandID != nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.IS_NOT_NULL()).AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(filter.BrandID)))
+		validCondition = true
+	}
+	if !validCondition {
+		return nil, errors.New("filter is invalid")
+	}
+
+	query, args := table.PharmaSheetMedicineBlisterDateHistories.
+		SELECT(
+			table.PharmaSheetMedicineBlisterDateHistories.ID,
+			table.PharmaSheetMedicineBlisterDateHistories.WarehouseID,
+			table.PharmaSheetMedicineBlisterDateHistories.MedicationID,
+			table.PharmaSheetMedicineBlisterDateHistories.BrandID,
+			table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate,
+		).
+		WHERE(condition).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var medicineBlisterDateHistories []model.MedicineBlisterDateHistory
+	for rows.Next() {
+		var medicineBlisterDateHistory model.MedicineBlisterDateHistory
+		err = rows.Scan(
+			&medicineBlisterDateHistory.ID,
+			&medicineBlisterDateHistory.WarehouseID,
+			&medicineBlisterDateHistory.MedicationID,
+			&medicineBlisterDateHistory.BrandID,
+			&medicineBlisterDateHistory.BlisterChangeDate,
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, err
+		}
+		medicineBlisterDateHistories = append(medicineBlisterDateHistories, medicineBlisterDateHistory)
+	}
+
+	return medicineBlisterDateHistories, nil
 }
 
 func (r *medicine) CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error) {

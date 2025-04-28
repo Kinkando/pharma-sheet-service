@@ -194,6 +194,11 @@ type DeleteMedicineBrandFilter struct {
 	BrandID      uuid.UUID
 }
 
+type FilterMedicineBrandBlisterDateHistory struct {
+	BrandID      *uuid.UUID
+	MedicationID *string
+}
+
 type CreateMedicineBlisterChangeDateHistoryRequest struct {
 	MedicationID      string     `json:"medicationID" validate:"required"`
 	WarehouseID       string     `json:"warehouseID" validate:"required"`

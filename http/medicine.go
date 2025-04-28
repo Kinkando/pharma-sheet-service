@@ -95,6 +95,9 @@ func (h *MedicineHandler) createMedicine(c echo.Context) error {
 
 	medicationID, err := h.medicineService.CreateMedicine(ctx, req)
 	if err != nil {
+		if model.IsConflictError(err) {
+			return c.JSON(http.StatusConflict, echo.Map{"error": err.Error()})
+		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 

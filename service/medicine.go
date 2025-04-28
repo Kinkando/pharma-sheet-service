@@ -110,7 +110,37 @@ func (s *medicine) DeleteMedicine(ctx context.Context, medicationID string) erro
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	if len(medicineBrands) > 0 {
+	forceDelete := false
+	if !forceDelete {
+		// Validate: prevent delete if have medicine brands
+		if len(medicineBrands) > 0 {
+			logger.Context(ctx).Error("cannot delete medicine because it has medicine brands")
+			return echo.NewHTTPError(http.StatusLocked, echo.Map{"error": "cannot delete medicine because it has medicine brands"})
+		}
+
+		// Validate: prevent delete if have medicine blister change date histories
+		histories, err := s.medicineRepository.ListMedicineBlisterChangeDateHistory(ctx, model.FilterMedicineBrandBlisterDateHistory{MedicationID: &medicationID})
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+		if len(histories) > 0 {
+			logger.Context(ctx).Error("cannot delete medicine because it has medicine blister change date history")
+			return echo.NewHTTPError(http.StatusLocked, echo.Map{"error": "cannot delete medicine because it has medicine blister change date history"})
+		}
+
+		// Validate: prevent delete if have medicine houses
+		houses, err := s.medicineRepository.GetMedicineHouses(ctx, model.FilterMedicineHouse{MedicationID: medicationID})
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+		if len(houses) > 0 {
+			logger.Context(ctx).Error("cannot delete medicine because it has medicine houses")
+			return echo.NewHTTPError(http.StatusLocked, echo.Map{"error": "cannot delete medicine because it has medicine houses"})
+		}
+
+	} else {
 		for _, brand := range medicineBrands {
 			if brand.BlisterImageURL != nil {
 				err = s.storage.Delete(ctx, *brand.BlisterImageURL)
@@ -345,7 +375,21 @@ func (s *medicine) DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64
 		return 0, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	if len(medicineBrands) > 0 {
+	forceDelete := false
+	if !forceDelete {
+		for _, brand := range medicineBrands {
+			histories, err := s.medicineRepository.ListMedicineBlisterChangeDateHistory(ctx, model.FilterMedicineBrandBlisterDateHistory{BrandID: &brand.ID, MedicationID: &brand.MedicationID})
+			if err != nil {
+				logger.Context(ctx).Error(err)
+				return 0, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+			}
+			if len(histories) > 0 {
+				logger.Context(ctx).Error("cannot delete medicine brand because it has medicine blister change date history")
+				return 0, echo.NewHTTPError(http.StatusLocked, echo.Map{"error": "cannot delete medicine brand because it has medicine blister change date history"})
+			}
+		}
+
+	} else {
 		for _, brand := range medicineBrands {
 			if brand.BlisterImageURL != nil {
 				err = s.storage.Delete(ctx, *brand.BlisterImageURL)
@@ -430,6 +474,9 @@ func (s *medicine) checkWarehouseManagementRole(ctx context.Context, id string, 
 		role, err = s.medicineRepository.GetMedicineRole(ctx, id, userProfile.UserID)
 		if err != nil {
 			logger.Context(ctx).Error(err)
+			if errors.Is(err, model.ErrResourceNotAllowed) {
+				return echo.NewHTTPError(http.StatusLocked, echo.Map{"error": err.Error()})
+			}
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 		}
 	case idTypeWarehouse:
