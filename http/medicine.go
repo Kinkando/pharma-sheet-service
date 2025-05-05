@@ -25,6 +25,7 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 	route := e.Group("/medicine")
 	route.GET("", handler.getMedicines)
 	route.GET("/master/all", handler.getAllMedicines)
+	route.GET("/master/pagination", handler.getMedicineMasterPagination)
 	route.GET("/:medicationID", handler.getMedicine)
 	route.POST("/:medicationID", handler.createMedicine)
 	route.PATCH("/:medicationID", handler.updateMedicine)
@@ -74,6 +75,29 @@ func (h *MedicineHandler) getAllMedicines(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	data, err := h.medicineService.ListMedicinesMaster(ctx)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (h *MedicineHandler) getMedicineMasterPagination(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.Pagination
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+	req.AssignDefault()
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	data, err := h.medicineService.GetMedicinesPagination(ctx, req)
 	if err != nil {
 		return err
 	}

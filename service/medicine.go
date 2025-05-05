@@ -26,6 +26,7 @@ const (
 type Medicine interface {
 	GetMedicine(ctx context.Context, medicationID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (model.PagingWithMetadata[model.Medicine], error)
+	GetMedicinesPagination(ctx context.Context, filter model.Pagination) (model.PagingWithMetadata[model.Medicine], error)
 	ListMedicinesMaster(ctx context.Context) ([]model.Medicine, error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (string, error)
 	UpdateMedicine(ctx context.Context, req model.UpdateMedicineRequest) error
@@ -100,6 +101,21 @@ func (s *medicine) ListMedicinesMaster(ctx context.Context) ([]model.Medicine, e
 		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 	return medicines, nil
+}
+
+func (s *medicine) GetMedicinesPagination(ctx context.Context, filter model.Pagination) (res model.PagingWithMetadata[model.Medicine], err error) {
+	data, total, err := s.medicineRepository.GetMedicinesPagination(ctx, filter)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	for index := range data {
+		data[index] = s.injectMedicineImageURL(ctx, data[index])
+	}
+
+	res = model.PaginationResponse(data, filter, total)
+	return res, nil
 }
 
 func (s *medicine) CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (string, error) {

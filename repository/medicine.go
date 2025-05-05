@@ -24,6 +24,7 @@ type Medicine interface {
 	GetMedicineRole(ctx context.Context, medicationID, userID string) (genmodel.PharmaSheetRole, error)
 	GetMedicine(ctx context.Context, medicationID string) (model.Medicine, error)
 	GetMedicines(ctx context.Context, filter model.FilterMedicine) (data []model.Medicine, total uint64, err error)
+	GetMedicinesPagination(ctx context.Context, filter model.Pagination) (data []model.Medicine, total uint64, err error)
 	ListMedicines(ctx context.Context, filter model.ListMedicine) ([]model.Medicine, error)
 	ListMedicinesMaster(ctx context.Context) ([]model.Medicine, error)
 	CreateMedicine(ctx context.Context, req model.CreateMedicineRequest) (medicationID string, err error)
@@ -464,6 +465,66 @@ func (r *medicine) GetMedicines(ctx context.Context, filter model.FilterMedicine
 	}
 
 	return sortedData, total, nil
+}
+
+func (r *medicine) GetMedicinesPagination(ctx context.Context, filter model.Pagination) (data []model.Medicine, total uint64, err error) {
+	condition := postgres.Bool(true)
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		search := postgres.String("%" + strings.ToLower(search) + "%")
+		condition = postgres.OR(
+			postgres.LOWER(table.PharmaSheetMedicines.MedicalName).LIKE(search),
+			postgres.LOWER(table.PharmaSheetMedicines.MedicationID).LIKE(search),
+		)
+	}
+
+	sortBy := filter.SortBy("medication_id ASC")
+	sorts := strings.Split(sortBy, " ")
+	order := sorts[1]
+	switch sorts[0] {
+	case "medication_id":
+		sortBy = fmt.Sprintf("%s.medication_id %s", table.PharmaSheetMedicines.TableName(), order)
+	}
+
+	query, args := table.PharmaSheetMedicines.
+		SELECT(postgres.COUNT(table.PharmaSheetMedicines.MedicationID)).
+		WHERE(condition).
+		Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&total)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	if total == 0 {
+		return
+	}
+
+	query, args = table.PharmaSheetMedicines.
+		SELECT(table.PharmaSheetMedicines.MedicationID, table.PharmaSheetMedicines.MedicalName).
+		WHERE(condition).
+		LIMIT(int64(filter.Limit)).
+		OFFSET(int64(filter.Offset)).
+		ORDER_BY(postgres.Raw(sortBy)).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var medicine model.Medicine
+		err = rows.Scan(&medicine.MedicationID, &medicine.MedicalName)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, 0, err
+		}
+		data = append(data, medicine)
+	}
+
+	return data, total, nil
 }
 
 func (r *medicine) ListMedicines(ctx context.Context, filter model.ListMedicine) (data []model.Medicine, err error) {
