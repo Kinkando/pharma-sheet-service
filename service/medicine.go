@@ -37,6 +37,7 @@ type Medicine interface {
 	DeleteMedicineHouse(ctx context.Context, id uuid.UUID) (int64, error)
 
 	GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (model.PagingWithMetadata[model.Medicine], error)
+	GetMedicineBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (model.PagingWithMetadata[model.MedicineBrand], error)
 	CreateMedicineBrand(ctx context.Context, req model.CreateMedicineBrandRequest) (string, error)
 	UpdateMedicineBrand(ctx context.Context, req model.UpdateMedicineBrandRequest) error
 	DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64, error)
@@ -277,6 +278,21 @@ func (s *medicine) GetMedicineWithBrands(ctx context.Context, filter model.Filte
 
 	for index := range data {
 		data[index] = s.injectMedicineImageURL(ctx, data[index])
+	}
+
+	res = model.PaginationResponse(data, filter.Pagination, total)
+	return res, nil
+}
+
+func (s *medicine) GetMedicineBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (res model.PagingWithMetadata[model.MedicineBrand], err error) {
+	data, total, err := s.medicineRepository.GetMedicineBrandsPagination(ctx, filter)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	for index := range data {
+		data[index] = s.injectMedicineBrandImageURL(ctx, data[index])
 	}
 
 	res = model.PaginationResponse(data, filter.Pagination, total)
@@ -553,4 +569,21 @@ func (s *medicine) injectMedicineImageURL(ctx context.Context, medicine model.Me
 		}
 	}
 	return medicine
+}
+
+func (s *medicine) injectMedicineBrandImageURL(ctx context.Context, medicineBrand model.MedicineBrand) model.MedicineBrand {
+	host := ctx.Value("host").(string)
+	if medicineBrand.BlisterImageURL != nil {
+		url := host + "/file/" + *medicineBrand.BlisterImageURL
+		medicineBrand.BlisterImageURL = &url
+	}
+	if medicineBrand.TabletImageURL != nil {
+		url := host + "/file/" + *medicineBrand.TabletImageURL
+		medicineBrand.TabletImageURL = &url
+	}
+	if medicineBrand.BoxImageURL != nil {
+		url := host + "/file/" + *medicineBrand.BoxImageURL
+		medicineBrand.BoxImageURL = &url
+	}
+	return medicineBrand
 }

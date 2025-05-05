@@ -38,6 +38,7 @@ type Medicine interface {
 
 	GetMedicineBrands(ctx context.Context, req model.FilterMedicineBrand) ([]model.MedicineBrand, error)
 	GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.Medicine, total uint64, err error)
+	GetMedicineBrandsPagination(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.MedicineBrand, total uint64, err error)
 	CreateMedicineBrand(ctx context.Context, req model.CreateMedicineBrandRequest) (string, error)
 	UpdateMedicineBrand(ctx context.Context, req model.UpdateMedicineBrandRequest) error
 	DeleteMedicineBrand(ctx context.Context, filter model.DeleteMedicineBrandFilter) (int64, error)
@@ -1044,6 +1045,90 @@ func (r *medicine) GetMedicineWithBrands(ctx context.Context, filter model.Filte
 				}
 			}
 		}
+	}
+
+	return
+}
+
+func (r *medicine) GetMedicineBrandsPagination(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.MedicineBrand, total uint64, err error) {
+	sortBy := filter.SortBy(table.PharmaSheetMedicines.TableName() + ".medication_id ASC")
+	sorts := strings.Split(sortBy, " ")
+	order := sorts[1]
+	switch sorts[0] {
+	case "medication_id":
+		sortBy = fmt.Sprintf("%s.medication_id %s", table.PharmaSheetMedicines.TableName(), order)
+	}
+
+	condition := postgres.Bool(true)
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		search := postgres.String("%" + strings.ToLower(search) + "%")
+		condition = condition.AND(
+			postgres.OR(
+				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeID).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeName).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicines.MedicalName).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicines.MedicationID).LIKE(search),
+			),
+		)
+	}
+
+	query, args := table.PharmaSheetMedicines.
+		INNER_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicines.MedicationID.EQ(table.PharmaSheetMedicineBrands.MedicationID)).
+		SELECT(postgres.COUNT(table.PharmaSheetMedicineBrands.ID).AS("total")).
+		WHERE(condition).
+		Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&total)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	if total == 0 {
+		return
+	}
+
+	query, args = table.PharmaSheetMedicines.
+		INNER_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicines.MedicationID.EQ(table.PharmaSheetMedicineBrands.MedicationID)).
+		SELECT(
+			table.PharmaSheetMedicineBrands.ID,
+			table.PharmaSheetMedicines.MedicationID,
+			table.PharmaSheetMedicines.MedicalName,
+			table.PharmaSheetMedicineBrands.TradeID,
+			table.PharmaSheetMedicineBrands.TradeName,
+			table.PharmaSheetMedicineBrands.BlisterImageURL,
+			table.PharmaSheetMedicineBrands.TabletImageURL,
+			table.PharmaSheetMedicineBrands.BoxImageURL,
+		).
+		WHERE(condition).
+		LIMIT(int64(filter.Limit)).
+		OFFSET(int64(filter.Offset)).
+		ORDER_BY(postgres.Raw(sortBy)).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var medicine model.MedicineBrand
+		err = rows.Scan(
+			&medicine.ID,
+			&medicine.MedicationID,
+			&medicine.MedicalName,
+			&medicine.TradeID,
+			&medicine.TradeName,
+			&medicine.BlisterImageURL,
+			&medicine.TabletImageURL,
+			&medicine.BoxImageURL,
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, 0, err
+		}
+		data = append(data, medicine)
 	}
 
 	return

@@ -37,7 +37,7 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 	houseRoute.DELETE("/:id", handler.deleteMedicineHouse)
 
 	brandRoute := e.Group("/brand")
-	brandRoute.GET("", handler.getMedicineWithBrands)
+	brandRoute.GET("", handler.getMedicineBrands)
 	brandRoute.POST("", handler.createMedicineBrand)
 	brandRoute.PUT("/:id", handler.updateMedicineBrand)
 	brandRoute.DELETE("/:id", handler.deleteMedicineBrand)
@@ -238,7 +238,7 @@ func (h *MedicineHandler) deleteMedicineHouse(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *MedicineHandler) getMedicineWithBrands(c echo.Context) error {
+func (h *MedicineHandler) getMedicineBrands(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	var req model.FilterMedicineWithBrand
@@ -253,7 +253,7 @@ func (h *MedicineHandler) getMedicineWithBrands(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	data, err := h.medicineService.GetMedicineWithBrands(ctx, req)
+	data, err := h.medicineService.GetMedicineBrands(ctx, req)
 	if err != nil {
 		return err
 	}
