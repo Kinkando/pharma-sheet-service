@@ -169,27 +169,27 @@ func (s *medicine) DeleteMedicine(ctx context.Context, medicationID string) erro
 			return echo.NewHTTPError(http.StatusLocked, echo.Map{"error": "cannot delete medicine because it has medicine houses"})
 		}
 
-	} else {
-		for _, brand := range medicineBrands {
-			if brand.BlisterImageURL != nil {
-				err = s.storage.Delete(ctx, *brand.BlisterImageURL)
-				if err != nil {
-					logger.Context(ctx).Warn(err)
-				}
-			}
+	}
 
-			if brand.BoxImageURL != nil {
-				err = s.storage.Delete(ctx, *brand.BoxImageURL)
-				if err != nil {
-					logger.Context(ctx).Warn(err)
-				}
+	for _, brand := range medicineBrands {
+		if brand.BlisterImageURL != nil {
+			err = s.storage.Delete(ctx, *brand.BlisterImageURL)
+			if err != nil {
+				logger.Context(ctx).Warn(err)
 			}
+		}
 
-			if brand.TabletImageURL != nil {
-				err = s.storage.Delete(ctx, *brand.TabletImageURL)
-				if err != nil {
-					logger.Context(ctx).Warn(err)
-				}
+		if brand.BoxImageURL != nil {
+			err = s.storage.Delete(ctx, *brand.BoxImageURL)
+			if err != nil {
+				logger.Context(ctx).Warn(err)
+			}
+		}
+
+		if brand.TabletImageURL != nil {
+			err = s.storage.Delete(ctx, *brand.TabletImageURL)
+			if err != nil {
+				logger.Context(ctx).Warn(err)
 			}
 		}
 	}
@@ -461,27 +461,27 @@ func (s *medicine) DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64
 			}
 		}
 
-	} else {
-		for _, brand := range medicineBrands {
-			if brand.BlisterImageURL != nil {
-				err = s.storage.Delete(ctx, *brand.BlisterImageURL)
-				if err != nil {
-					logger.Context(ctx).Warn(err)
-				}
-			}
+	}
 
-			if brand.BoxImageURL != nil {
-				err = s.storage.Delete(ctx, *brand.BoxImageURL)
-				if err != nil {
-					logger.Context(ctx).Warn(err)
-				}
+	for _, brand := range medicineBrands {
+		if brand.BlisterImageURL != nil {
+			err = s.storage.Delete(ctx, *brand.BlisterImageURL)
+			if err != nil {
+				logger.Context(ctx).Warn(err)
 			}
+		}
 
-			if brand.TabletImageURL != nil {
-				err = s.storage.Delete(ctx, *brand.TabletImageURL)
-				if err != nil {
-					logger.Context(ctx).Warn(err)
-				}
+		if brand.BoxImageURL != nil {
+			err = s.storage.Delete(ctx, *brand.BoxImageURL)
+			if err != nil {
+				logger.Context(ctx).Warn(err)
+			}
+		}
+
+		if brand.TabletImageURL != nil {
+			err = s.storage.Delete(ctx, *brand.TabletImageURL)
+			if err != nil {
+				logger.Context(ctx).Warn(err)
 			}
 		}
 	}
