@@ -103,6 +103,11 @@ type FilterMedicine struct {
 	WarehouseID string `json:"-" query:"warehouseID"`
 }
 
+type FilterMedicineBlisterDateHistory struct {
+	Pagination
+	WarehouseID string `json:"-" query:"warehouseID"`
+}
+
 type ListMedicine struct {
 	WarehouseID string
 }
@@ -210,6 +215,17 @@ type DeleteMedicineBrandFilter struct {
 type FilterMedicineBrandBlisterDateHistory struct {
 	BrandID      *uuid.UUID
 	MedicationID *string
+}
+
+type MedicineBlisterDateHistoryGroup struct {
+	MedicationID  string                                      `json:"medicationID"`
+	MedicalName   string                                      `json:"medicalName"`
+	WarehouseID   string                                      `json:"warehouseID"`
+	WarehouseName string                                      `json:"warehouseName"`
+	BrandID       *uuid.UUID                                  `json:"brandID,omitempty"`
+	TradeID       *string                                     `json:"tradeID,omitempty"`
+	TradeName     *string                                     `json:"tradeName,omitempty"`
+	Histories     []MedicineBrandBlisterDateDetailHistoryView `json:"histories"`
 }
 
 type CreateMedicineBlisterChangeDateHistoryRequest struct {

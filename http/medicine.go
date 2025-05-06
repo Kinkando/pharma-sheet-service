@@ -44,6 +44,7 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 	brandRoute.DELETE("/:id", handler.deleteMedicineBrand)
 
 	historyRoute := e.Group("/history")
+	historyRoute.GET("", handler.listMedicineBlisterDateHistory)
 	historyRoute.POST("", handler.createMedicineBlisterDateHistory)
 	historyRoute.DELETE("/:id", handler.deleteMedicineBlisterDateHistory)
 }
@@ -360,6 +361,31 @@ func (h *MedicineHandler) deleteMedicineBrand(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *MedicineHandler) listMedicineBlisterDateHistory(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.FilterMedicineBlisterDateHistory
+	err := c.Bind(&req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+	req.Pagination.AssignDefault()
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	data, err := h.medicineService.ListMedicineBlisterChangeDateHistory(ctx, req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, data)
 }
 
 func (h *MedicineHandler) createMedicineBlisterDateHistory(c echo.Context) error {

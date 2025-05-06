@@ -43,6 +43,7 @@ type Medicine interface {
 	UpdateMedicineBrand(ctx context.Context, req model.UpdateMedicineBrandRequest) error
 	DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64, error)
 
+	ListMedicineBlisterChangeDateHistory(ctx context.Context, req model.FilterMedicineBlisterDateHistory) (model.PagingWithMetadata[model.MedicineBlisterDateHistoryGroup], error)
 	CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error)
 	DeleteMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) error
 }
@@ -494,6 +495,17 @@ func (s *medicine) DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64
 		return 0, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "medicationID is not found"})
 	}
 	return rowsAffected, nil
+}
+
+func (s *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, req model.FilterMedicineBlisterDateHistory) (res model.PagingWithMetadata[model.MedicineBlisterDateHistoryGroup], err error) {
+	data, total, err := s.medicineRepository.ListMedicineBlisterChangeDateHistoryPagination(ctx, req)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	res = model.PaginationResponse(data, req.Pagination, total)
+	return res, nil
 }
 
 func (s *medicine) CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error) {

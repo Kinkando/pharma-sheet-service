@@ -46,6 +46,7 @@ type Medicine interface {
 
 	GetMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) (model.MedicineBlisterDateHistory, error)
 	ListMedicineBlisterChangeDateHistory(ctx context.Context, filter model.FilterMedicineBrandBlisterDateHistory) ([]model.MedicineBlisterDateHistory, error)
+	ListMedicineBlisterChangeDateHistoryPagination(ctx context.Context, filter model.FilterMedicineBlisterDateHistory) (data []model.MedicineBlisterDateHistoryGroup, total uint64, err error)
 	CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error)
 	DeleteMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) error
 }
@@ -1383,6 +1384,147 @@ func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, fil
 	}
 
 	return medicineBlisterDateHistories, nil
+}
+
+func (r *medicine) ListMedicineBlisterChangeDateHistoryPagination(ctx context.Context, filter model.FilterMedicineBlisterDateHistory) (data []model.MedicineBlisterDateHistoryGroup, total uint64, err error) {
+	sortBy := filter.SortBy(table.PharmaSheetMedicineBlisterDateHistories.TableName() + ".medication_id ASC")
+	sorts := strings.Split(sortBy, " ")
+	order := sorts[1]
+	switch sorts[0] {
+	case "medication_id":
+		sortBy = fmt.Sprintf("%s.medication_id %s", table.PharmaSheetMedicineBlisterDateHistories.TableName(), order)
+	case "warehouse_id":
+		sortBy = fmt.Sprintf("%s.warehouse_id %s", table.PharmaSheetMedicineBlisterDateHistories.TableName(), order)
+	}
+
+	condition := postgres.Bool(true)
+	if filter.WarehouseID != "" {
+		condition = condition.AND(table.PharmaSheetWarehouses.WarehouseID.EQ(postgres.String(filter.WarehouseID)))
+	}
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		search := postgres.String("%" + strings.ToLower(search) + "%")
+		condition = condition.AND(
+			postgres.OR(
+				postgres.LOWER(table.PharmaSheetMedicines.MedicationID).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicines.MedicalName).LIKE(search),
+				postgres.LOWER(table.PharmaSheetWarehouses.WarehouseID).LIKE(search),
+				postgres.LOWER(table.PharmaSheetWarehouses.Name).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeID).LIKE(search),
+				postgres.LOWER(table.PharmaSheetMedicineBrands.TradeName).LIKE(search),
+				postgres.LOWER(postgres.CAST(table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate).AS_TEXT()).LIKE(search),
+			),
+		)
+	}
+
+	query, args := table.PharmaSheetMedicineBlisterDateHistories.
+		INNER_JOIN(table.PharmaSheetWarehouses, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetMedicineBlisterDateHistories.WarehouseID)).
+		INNER_JOIN(table.PharmaSheetMedicines, table.PharmaSheetMedicines.MedicationID.EQ(table.PharmaSheetMedicineBlisterDateHistories.MedicationID)).
+		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicineBrands.ID.EQ(table.PharmaSheetMedicineBlisterDateHistories.BrandID)).
+		SELECT(postgres.COUNT(postgres.DISTINCT(postgres.CONCAT(table.PharmaSheetMedicineBlisterDateHistories.MedicationID, table.PharmaSheetMedicineBlisterDateHistories.WarehouseID, table.PharmaSheetMedicineBlisterDateHistories.BrandID))).AS("total")).
+		WHERE(condition).
+		Sql()
+	err = r.pgPool.QueryRow(ctx, query, args...).Scan(&total)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return
+	}
+
+	if total == 0 {
+		return
+	}
+
+	query, args = table.PharmaSheetMedicineBlisterDateHistories.
+		INNER_JOIN(table.PharmaSheetWarehouses, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetMedicineBlisterDateHistories.WarehouseID)).
+		INNER_JOIN(table.PharmaSheetMedicines, table.PharmaSheetMedicines.MedicationID.EQ(table.PharmaSheetMedicineBlisterDateHistories.MedicationID)).
+		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicineBrands.ID.EQ(table.PharmaSheetMedicineBlisterDateHistories.BrandID)).
+		SELECT(
+			table.PharmaSheetMedicineBlisterDateHistories.WarehouseID,
+			table.PharmaSheetWarehouses.Name,
+			table.PharmaSheetMedicineBlisterDateHistories.MedicationID,
+			table.PharmaSheetMedicines.MedicalName,
+			table.PharmaSheetMedicineBlisterDateHistories.BrandID,
+			table.PharmaSheetMedicineBrands.TradeID,
+			table.PharmaSheetMedicineBrands.TradeName,
+		).
+		WHERE(condition).
+		LIMIT(int64(filter.Limit)).
+		OFFSET(int64(filter.Offset)).
+		GROUP_BY(
+			table.PharmaSheetMedicineBlisterDateHistories.WarehouseID,
+			table.PharmaSheetWarehouses.Name,
+			table.PharmaSheetMedicineBlisterDateHistories.MedicationID,
+			table.PharmaSheetMedicines.MedicalName,
+			table.PharmaSheetMedicineBlisterDateHistories.BrandID,
+			table.PharmaSheetMedicineBrands.TradeID,
+			table.PharmaSheetMedicineBrands.TradeName,
+		).
+		ORDER_BY(postgres.Raw(sortBy)).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var history model.MedicineBlisterDateHistoryGroup
+		err = rows.Scan(
+			&history.WarehouseID,
+			&history.WarehouseName,
+			&history.MedicationID,
+			&history.MedicalName,
+			&history.BrandID,
+			&history.TradeID,
+			&history.TradeName,
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, 0, err
+		}
+		data = append(data, history)
+	}
+
+	for index, group := range data {
+		cond := table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(postgres.String(group.WarehouseID)).AND(table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(group.MedicationID)))
+		if group.BrandID != nil {
+			cond = cond.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(group.BrandID)))
+		} else {
+			cond = cond.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.IS_NULL())
+		}
+
+		query, args = table.PharmaSheetMedicineBlisterDateHistories.
+			SELECT(table.PharmaSheetMedicineBlisterDateHistories.ID, table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate).
+			WHERE(cond).
+			ORDER_BY(table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate).
+			Sql()
+
+		rows, err := r.pgPool.Query(ctx, query, args...)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, 0, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var history model.MedicineBlisterDateHistory
+			err = rows.Scan(
+				&history.ID,
+				&history.BlisterChangeDate,
+			)
+			if err != nil {
+				logger.Context(ctx).Error(err)
+				return nil, 0, err
+			}
+			data[index].Histories = append(data[index].Histories, model.MedicineBrandBlisterDateDetailHistoryView{
+				ID:   history.ID,
+				Date: history.BlisterChangeDate.Format(time.DateOnly),
+			})
+		}
+	}
+
+	return data, total, nil
 }
 
 func (r *medicine) CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error) {
