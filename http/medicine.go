@@ -39,6 +39,7 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 
 	brandRoute := e.Group("/brand")
 	brandRoute.GET("", handler.getMedicineBrands)
+	brandRoute.GET("/group", handler.getMedicineWithBrands)
 	brandRoute.POST("", handler.createMedicineBrand)
 	brandRoute.PUT("/:id", handler.updateMedicineBrand)
 	brandRoute.DELETE("/:id", handler.deleteMedicineBrand)
@@ -281,6 +282,29 @@ func (h *MedicineHandler) getMedicineBrands(c echo.Context) error {
 	}
 
 	data, err := h.medicineService.GetMedicineBrands(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (h *MedicineHandler) getMedicineWithBrands(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req model.FilterMedicineWithBrand
+	if err := c.Bind(&req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+	req.Pagination.AssignDefault()
+
+	if err := h.validate.Struct(req); err != nil {
+		logger.Context(ctx).Error(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	data, err := h.medicineService.GetMedicineWithBrands(ctx, req)
 	if err != nil {
 		return err
 	}
