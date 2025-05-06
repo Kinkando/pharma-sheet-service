@@ -237,7 +237,10 @@ type CreateMedicineBlisterChangeDateHistoryRequest struct {
 }
 
 type DeleteMedicineBlisterChangeDateHistoryRequest struct {
-	HistoryID uuid.UUID `param:"id" validate:"required,uuid"`
+	HistoryID    *uuid.UUID `param:"historyID" validate:"omitempty,uuid"`
+	MedicationID *string    `param:"medicationID"`
+	WarehouseID  *string    `param:"warehouseID"`
+	BrandID      *uuid.UUID `param:"brandID" validate:"omitempty,uuid"`
 }
 
 // TODO: temporary struct for medicine sheet

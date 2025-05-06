@@ -46,7 +46,9 @@ func NewMedicineHandler(e *echo.Echo, validate *validator.Validate, medicineServ
 	historyRoute := e.Group("/history")
 	historyRoute.GET("", handler.listMedicineBlisterDateHistory)
 	historyRoute.POST("", handler.createMedicineBlisterDateHistory)
-	historyRoute.DELETE("/:id", handler.deleteMedicineBlisterDateHistory)
+	historyRoute.DELETE("/warehouse/:warehouseID/medicine/:medicationID", handler.deleteMedicineBlisterDateHistory)
+	historyRoute.DELETE("/warehouse/:warehouseID/medicine/:medicationID/brand/:brandID", handler.deleteMedicineBlisterDateHistory)
+	historyRoute.DELETE("/:historyID", handler.deleteMedicineBlisterDateHistory)
 }
 
 func (h *MedicineHandler) getMedicines(c echo.Context) error {
@@ -432,7 +434,7 @@ func (h *MedicineHandler) deleteMedicineBlisterDateHistory(c echo.Context) error
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	err := h.medicineService.DeleteMedicineBlisterChangeDateHistory(ctx, req.HistoryID)
+	err := h.medicineService.DeleteMedicineBlisterChangeDateHistory(ctx, req)
 	if err != nil {
 		return err
 	}

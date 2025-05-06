@@ -45,7 +45,7 @@ type Medicine interface {
 
 	ListMedicineBlisterChangeDateHistory(ctx context.Context, req model.FilterMedicineBlisterDateHistory) (model.PagingWithMetadata[model.MedicineBlisterDateHistoryGroup], error)
 	CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error)
-	DeleteMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) error
+	DeleteMedicineBlisterChangeDateHistory(ctx context.Context, req model.DeleteMedicineBlisterChangeDateHistoryRequest) error
 }
 
 type medicine struct {
@@ -525,21 +525,29 @@ func (s *medicine) CreateMedicineBlisterChangeDateHistory(ctx context.Context, r
 	return id, nil
 }
 
-func (s *medicine) DeleteMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) error {
-	blisterChangeDateHistory, err := s.medicineRepository.GetMedicineBlisterChangeDateHistory(ctx, id)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		if errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "blisterChangeDateHistoryID is not found"})
+func (s *medicine) DeleteMedicineBlisterChangeDateHistory(ctx context.Context, filter model.DeleteMedicineBlisterChangeDateHistoryRequest) error {
+	warehouseID := ""
+	if filter.HistoryID != nil {
+		blisterChangeDateHistory, err := s.medicineRepository.GetMedicineBlisterChangeDateHistory(ctx, *filter.HistoryID)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			if errors.Is(err, sql.ErrNoRows) {
+				return echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "blisterChangeDateHistoryID is not found"})
+			}
+			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 		}
-		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		warehouseID = blisterChangeDateHistory.WarehouseID
+	} else if filter.WarehouseID != nil {
+		warehouseID = *filter.WarehouseID
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "warehouseID is required"})
 	}
-	err = s.checkWarehouseManagementRole(ctx, blisterChangeDateHistory.WarehouseID, idTypeWarehouse, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
+	err := s.checkWarehouseManagementRole(ctx, warehouseID, idTypeWarehouse, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err
 	}
-	err = s.medicineRepository.DeleteMedicineBlisterChangeDateHistory(ctx, id)
+	err = s.medicineRepository.DeleteMedicineBlisterChangeDateHistory(ctx, filter)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}

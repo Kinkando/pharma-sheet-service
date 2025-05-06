@@ -48,7 +48,7 @@ type Medicine interface {
 	ListMedicineBlisterChangeDateHistory(ctx context.Context, filter model.FilterMedicineBrandBlisterDateHistory) ([]model.MedicineBlisterDateHistory, error)
 	ListMedicineBlisterChangeDateHistoryPagination(ctx context.Context, filter model.FilterMedicineBlisterDateHistory) (data []model.MedicineBlisterDateHistoryGroup, total uint64, err error)
 	CreateMedicineBlisterChangeDateHistory(ctx context.Context, req model.CreateMedicineBlisterChangeDateHistoryRequest) (string, error)
-	DeleteMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) error
+	DeleteMedicineBlisterChangeDateHistory(ctx context.Context, req model.DeleteMedicineBlisterChangeDateHistoryRequest) error
 }
 
 type medicine struct {
@@ -1559,8 +1559,31 @@ func (r *medicine) CreateMedicineBlisterChangeDateHistory(ctx context.Context, r
 	return medicineHistory.ID.String(), nil
 }
 
-func (r *medicine) DeleteMedicineBlisterChangeDateHistory(ctx context.Context, id uuid.UUID) error {
-	stmt, args := table.PharmaSheetMedicineBlisterDateHistories.DELETE().WHERE(table.PharmaSheetMedicineBlisterDateHistories.ID.EQ(postgres.UUID(id))).Sql()
+func (r *medicine) DeleteMedicineBlisterChangeDateHistory(ctx context.Context, req model.DeleteMedicineBlisterChangeDateHistoryRequest) error {
+	condition := postgres.Bool(true)
+	validCondition := false
+	if req.HistoryID != nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.ID.EQ(postgres.UUID(*req.HistoryID)))
+		validCondition = true
+	}
+	if req.WarehouseID != nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(postgres.String(*req.WarehouseID)))
+		validCondition = true
+	}
+	if req.MedicationID != nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(*req.MedicationID)))
+		validCondition = true
+	}
+	if req.BrandID != nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(*req.BrandID)))
+		validCondition = true
+	}
+
+	if !validCondition {
+		return errors.New("filter is invalid")
+	}
+
+	stmt, args := table.PharmaSheetMedicineBlisterDateHistories.DELETE().WHERE(condition).Sql()
 	_, err := r.pgPool.Exec(ctx, stmt, args...)
 	if err != nil {
 		logger.Context(ctx).Error(err)
