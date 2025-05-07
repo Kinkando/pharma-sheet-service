@@ -92,12 +92,12 @@ type MedicineBrandSheet struct {
 func (m *MedicineBrandSheet) FileIDs() (blisterFileID, tabletFileID, boxFileID *string) {
 	if m.BlisterImageURL != "" {
 		if fileID := google.FileID(m.BlisterImageURL); fileID != "" && fileID != "-" {
-			boxFileID = &fileID
+			blisterFileID = &fileID
 		}
 	}
 	if m.TabletImageURL != "" {
 		if fileID := google.FileID(m.TabletImageURL); fileID != "" && fileID != "-" {
-			boxFileID = &fileID
+			tabletFileID = &fileID
 		}
 	}
 	if m.BoxImageURL != "" {
