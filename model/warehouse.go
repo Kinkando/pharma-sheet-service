@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
-	"google.golang.org/api/sheets/v4"
 )
 
 type WarehouseGroup string
@@ -20,9 +19,13 @@ type Warehouse struct {
 	Name                                string     `json:"warehouseName"`
 	Role                                string     `json:"role"`
 	SheetURL                            *string    `json:"sheetURL,omitempty"`
+	MedicineSheetID                     *int32     `json:"-"`
 	MedicineSheetName                   *string    `json:"medicineSheetName,omitempty"`
+	MedicineBrandSheetID                *int32     `json:"-"`
 	MedicineHouseSheetName              *string    `json:"medicineHouseSheetName,omitempty"`
+	MedicineHouseSheetID                *int32     `json:"-"`
 	MedicineBrandSheetName              *string    `json:"medicineBrandSheetName,omitempty"`
+	MedicineBlisterDateHistorySheetID   *int32     `json:"-"`
 	MedicineBlisterDateHistorySheetName *string    `json:"medicineBlisterDateHistorySheetName,omitempty"`
 	LatestSyncedAt                      *time.Time `json:"latestSyncedAt,omitempty"`
 }
@@ -94,34 +97,6 @@ type WarehouseUser struct {
 	User
 	Role   model.PharmaSheetRole           `json:"role"`
 	Status model.PharmaSheetApprovalStatus `json:"status"`
-}
-
-type GetSyncMedicineMetadataRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required"`
-	URL         string `query:"url" validate:"required,url"`
-}
-
-type SyncMedicineRequest struct {
-	WarehouseID string `param:"warehouseID" validate:"required"`
-	URL         string `json:"url" validate:"required,url"`
-}
-
-type SyncMedicineMetadata struct {
-	Title                string `json:"title"`
-	SheetName            string `json:"sheetName"`
-	TotalMedicine        uint64 `json:"totalMedicine"`
-	TotalNewMedicine     uint64 `json:"totalNewMedicine"`
-	TotalUpdatedMedicine uint64 `json:"totalUpdatedMedicine"`
-	TotalSkippedMedicine uint64 `json:"totalSkippedMedicine"`
-}
-
-type GoogleSheetData struct {
-	Sheet            *sheets.Sheet
-	SpreadsheetTitle string
-	SpreadsheetID    string
-	LockerID         map[string]string
-	MedicineSheets   []MedicineSheet
-	MedicineData     map[string]Medicine
 }
 
 type GetWarehouseUsersResponse struct {

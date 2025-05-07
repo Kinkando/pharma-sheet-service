@@ -4,13 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
-	"regexp"
 	"slices"
-	"strconv"
 
-	"firebase.google.com/go/auth"
 	"github.com/google/uuid"
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
@@ -40,40 +36,26 @@ type Warehouse interface {
 	LeaveWarehouse(ctx context.Context, warehouseID, userID string) error
 	ApproveUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
 	RejectUser(ctx context.Context, req model.ApprovalWarehouseUserRequest) error
-
-	SummarizeMedicineFromGoogleSheet(ctx context.Context, req model.GetSyncMedicineMetadataRequest) (model.SyncMedicineMetadata, error)
-	SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error
 }
 
 type warehouse struct {
 	warehouseRepository repository.Warehouse
 	userRepository      repository.User
 	medicineRepository  repository.Medicine
-	firebaseAuthen      *auth.Client
 	storage             google.Storage
-	drive               google.Drive
-	sheet               google.Sheet
-	isSyncUniqueByID    bool
 }
 
 func NewWarehouseService(
 	warehouseRepository repository.Warehouse,
 	userRepository repository.User,
 	medicineRepository repository.Medicine,
-	firebaseAuthen *auth.Client,
 	storage google.Storage,
-	drive google.Drive,
-	sheet google.Sheet,
 ) Warehouse {
 	return &warehouse{
 		warehouseRepository: warehouseRepository,
 		userRepository:      userRepository,
 		medicineRepository:  medicineRepository,
-		firebaseAuthen:      firebaseAuthen,
 		storage:             storage,
-		drive:               drive,
-		sheet:               sheet,
-		isSyncUniqueByID:    false,
 	}
 }
 
@@ -412,312 +394,4 @@ func (s *warehouse) RejectUser(ctx context.Context, req model.ApprovalWarehouseU
 	}
 
 	return nil
-}
-
-func (s *warehouse) SummarizeMedicineFromGoogleSheet(ctx context.Context, req model.GetSyncMedicineMetadataRequest) (metadata model.SyncMedicineMetadata, err error) {
-	panic("TODO: implement me!")
-	// data, err := s.getGoogleSheetData(ctx, model.SyncMedicineRequest(req), false)
-	// if err != nil {
-	// 	return
-	// }
-
-	// var (
-	// 	totalMedicine        uint64 = 0
-	// 	totalNewMedicine     uint64 = 0
-	// 	totalUpdatedMedicine uint64 = 0
-	// 	totalSkippedMedicine uint64 = 0
-	// )
-
-	// for _, medicineSheet := range data.MedicineSheets {
-	// 	totalMedicine++
-
-	// 	key := medicineSheet.Address
-	// 	if s.isSyncUniqueByID {
-	// 		key = medicineSheet.MedicationID
-	// 	}
-
-	// 	medicine, ok := data.MedicineData[key]
-	// 	if !ok {
-	// 		totalNewMedicine++
-	// 		continue
-	// 	}
-
-	// 	if !ok || medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
-	// 		totalUpdatedMedicine++
-	// 	} else {
-	// 		totalSkippedMedicine++
-	// 	}
-	// }
-
-	// metadata = model.SyncMedicineMetadata{
-	// 	Title:                data.SpreadsheetTitle,
-	// 	SheetName:            data.Sheet.Properties.Title,
-	// 	TotalMedicine:        totalMedicine,
-	// 	TotalNewMedicine:     totalNewMedicine,
-	// 	TotalUpdatedMedicine: totalUpdatedMedicine,
-	// 	TotalSkippedMedicine: totalSkippedMedicine,
-	// }
-
-	// return metadata, nil
-}
-
-func (s *warehouse) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error {
-	panic("TODO: implement me!")
-	// data, err := s.getGoogleSheetData(ctx, req, true)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// sheet := data.Sheet
-	// spreadsheetID := data.SpreadsheetID
-	// medicineSheets := data.MedicineSheets
-	// medicineMapping := data.MedicineData
-	// lockerID := data.LockerID
-
-	// columnIDIndex := 0
-	// if s.isSyncUniqueByID {
-	// 	columns, err := s.sheet.ReadColumns(ctx, sheet, option.WithGoogleSheetReadColumnIgnoreUserEnteredFormat(true))
-	// 	if err != nil {
-	// 		logger.Context(ctx).Error(err)
-	// 		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	// 	}
-
-	// 	columnIDIndex = slices.IndexFunc(columns, func(column option.GoogleSheetUpdateColumn) bool {
-	// 		return column.Value == "รหัส"
-	// 	})
-	// 	isFoundColumnID := columnIDIndex != -1
-	// 	if !isFoundColumnID {
-	// 		columnIDIndex = len(columns)
-	// 		err = s.sheet.Update(
-	// 			ctx,
-	// 			spreadsheetID,
-	// 			option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
-	// 			option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
-	// 			option.WithGoogleSheetUpdateColumns([]option.GoogleSheetUpdateColumn{{Value: "รหัส", Width: 500}}),
-	// 			option.WithGoogleSheetUpdateColumnStartIndex(int64(columnIDIndex)+1),
-	// 			option.WithGoogleSheetUpdateIsTextWraping(true),
-	// 			option.WithGoogleSheetUpdateFontSize(20),
-	// 		)
-	// 		if err != nil {
-	// 			logger.Context(ctx).Error(err)
-	// 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	// 		}
-	// 	}
-	// }
-
-	// for index, medicineSheet := range medicineSheets {
-	// 	locker, ok := lockerID[medicineSheet.LockerName]
-	// 	if !ok {
-	// 		lockerID[medicineSheet.LockerName], err = s.lockerRepository.CreateLocker(ctx, genmodel.PharmaSheetLockers{
-	// 			WarehouseID: uuid.MustParse(req.WarehouseID),
-	// 			Name:        medicineSheet.LockerName,
-	// 		})
-	// 		if err != nil {
-	// 			logger.Context(ctx).Error(err)
-	// 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	// 		}
-	// 		locker = lockerID[medicineSheet.LockerName]
-	// 	}
-
-	// 	createData := model.CreateMedicineRequest{
-	// 		WarehouseID: req.WarehouseID,
-	// 		LockerID:    locker,
-	// 		Floor:       medicineSheet.Floor,
-	// 		No:          medicineSheet.No,
-	// 		Address:     medicineSheet.Address,
-	// 		Description: medicineSheet.Description,
-	// 		MedicalName: medicineSheet.MedicalName,
-	// 		Label:       medicineSheet.Label,
-	// 	}
-
-	// 	updateData := model.UpdateMedicineRequest{
-	// 		MedicationID: medicineSheet.MedicationID,
-	// 		LockerID:     locker,
-	// 		Floor:        medicineSheet.Floor,
-	// 		No:           medicineSheet.No,
-	// 		Address:      medicineSheet.Address,
-	// 		Description:  medicineSheet.Description,
-	// 		MedicalName:  medicineSheet.MedicalName,
-	// 		Label:        medicineSheet.Label,
-	// 	}
-
-	// 	key := medicineSheet.Address
-	// 	if s.isSyncUniqueByID {
-	// 		key = medicineSheet.MedicationID
-	// 	}
-
-	// 	medicine, ok := medicineMapping[key]
-	// 	if ok && locker == medicine.LockerID && !medicineSheet.IsDifferent(medicine, s.isSyncUniqueByID) {
-	// 		continue
-	// 	}
-
-	// 	if ok {
-	// 		updateData.MedicationID = medicine.MedicationID
-	// 		err = s.medicineRepository.UpdateMedicine(ctx, updateData)
-	// 		if err != nil {
-	// 			logger.Context(ctx).Error(err)
-	// 		}
-	// 		continue
-	// 	}
-
-	// 	medicationID, err := s.medicineRepository.CreateMedicine(ctx, createData)
-	// 	if err != nil {
-	// 		logger.Context(ctx).Error(err)
-	// 		continue
-	// 	}
-
-	// 	if !s.isSyncUniqueByID {
-	// 		continue
-	// 	}
-
-	// 	col, _ := excelize.ColumnNumberToName(columnIDIndex + 1)
-	// 	err = s.sheet.Update(
-	// 		ctx,
-	// 		spreadsheetID,
-	// 		option.WithGoogleSheetUpdateSheetID(sheet.Properties.SheetId),
-	// 		option.WithGoogleSheetUpdateSheetTitle(sheet.Properties.Title),
-	// 		option.WithGoogleSheetUpdateData([][]option.GoogleSheetUpdateData{{{Value: medicationID}}}),
-	// 		option.WithGoogleSheetUpdateIsTextWraping(true),
-	// 		option.WithGoogleSheetUpdateFontSize(20),
-	// 		option.WithGoogleSheetUpdateStartCellRange(fmt.Sprintf("%s%d", col, index+2)),
-	// 	)
-	// 	if err != nil {
-	// 		logger.Context(ctx).Error(err)
-	// 		return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	// 	}
-	// }
-	// return nil
-}
-
-func (s *warehouse) getGoogleSheetData(ctx context.Context, req model.SyncMedicineRequest, isUpdateWarehouseSheet bool) (data model.GoogleSheetData, err error) {
-	panic("TODO: implement me!")
-	// err = s.checkWarehouseManagementRole(ctx, req.WarehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return data, err
-	// }
-
-	// spreadsheetID, sheetID, err := extractSpreadsheetInfo(req.URL)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "url is invalid"})
-	// }
-
-	// spreadsheet, err := s.sheet.Get(ctx, spreadsheetID)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "spreadsheetID is not found"})
-	// }
-
-	// var sheet *sheets.Sheet
-	// for _, spreadSheet := range spreadsheet.Sheets {
-	// 	if spreadSheet.Properties.SheetId == int64(sheetID) {
-	// 		sheet = spreadSheet
-	// 		break
-	// 	}
-	// }
-	// if sheet == nil {
-	// 	logger.Context(ctx).Warnf("sheetID is not found: %d", sheetID)
-	// 	return data, echo.NewHTTPError(http.StatusNotFound, echo.Map{"error": "sheetID is not found"})
-	// }
-
-	// isConflict, err := s.warehouseRepository.CheckConflictWarehouseSheet(ctx, req.WarehouseID, spreadsheetID, sheetID)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	// }
-	// if isConflict {
-	// 	return data, echo.NewHTTPError(http.StatusConflict, echo.Map{"error": "sheet is already sync by another warehouse"})
-	// }
-
-	// if isUpdateWarehouseSheet {
-	// 	warehouseSheet := genmodel.PharmaSheetWarehouseSheets{
-	// 		WarehouseID:   uuid.MustParse(req.WarehouseID),
-	// 		SpreadsheetID: spreadsheetID,
-	// 		SheetID:       sheetID,
-	// 	}
-	// 	err = s.warehouseRepository.UpsertWarehouseSheet(ctx, warehouseSheet)
-	// 	if err != nil {
-	// 		logger.Context(ctx).Error(err)
-	// 		return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	// 	}
-	// }
-
-	// var medicineSheets []model.MedicineSheet
-	// _, err = s.sheet.Read(ctx, sheet, &medicineSheets)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return data, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	// }
-
-	// lockers, err := s.lockerRepository.GetLockers(ctx, req.WarehouseID)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	// }
-	// lockerID := make(map[string]string)
-	// for _, locker := range lockers {
-	// 	lockerID[locker.Name] = locker.LockerID.String()
-	// }
-
-	// medicines, err := s.medicineRepository.ListMedicines(ctx, model.ListMedicine{WarehouseID: req.WarehouseID})
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return data, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	// }
-	// medicineMapping := make(map[string]model.Medicine)
-	// for _, medicine := range medicines {
-	// 	if s.isSyncUniqueByID {
-	// 		medicineMapping[medicine.MedicationID] = medicine
-	// 	} else {
-	// 		medicineMapping[medicine.Address] = medicine
-	// 	}
-	// }
-
-	// data = model.GoogleSheetData{
-	// 	Sheet:            sheet,
-	// 	SpreadsheetTitle: spreadsheet.Properties.Title,
-	// 	SpreadsheetID:    spreadsheetID,
-	// 	LockerID:         lockerID,
-	// 	MedicineSheets:   medicineSheets,
-	// 	MedicineData:     medicineMapping,
-	// }
-
-	// return data, nil
-}
-
-func extractSpreadsheetInfo(url string) (string, int32, error) {
-	// Regular expressions for extracting the spreadsheet ID and gid
-	spreadsheetIDPattern := `\/d\/([a-zA-Z0-9-_]+)`
-	gidPattern := `gid=(\d+)`
-
-	// Compile the regex patterns
-	spreadsheetIDRegex, err := regexp.Compile(spreadsheetIDPattern)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to compile spreadsheet ID regex: %v", err)
-	}
-
-	gidRegex, err := regexp.Compile(gidPattern)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to compile gid regex: %v", err)
-	}
-
-	// Find the spreadsheet ID and gid using the regex
-	spreadsheetIDMatches := spreadsheetIDRegex.FindStringSubmatch(url)
-	if len(spreadsheetIDMatches) < 2 {
-		return "", 0, fmt.Errorf("failed to extract spreadsheet ID from the URL")
-	}
-
-	gidMatches := gidRegex.FindStringSubmatch(url)
-	if len(gidMatches) < 2 {
-		return "", 0, fmt.Errorf("failed to extract gid from the URL")
-	}
-
-	gid, err := strconv.Atoi(gidMatches[1])
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to convert gid to integer: %v", err)
-	}
-
-	// Return the extracted values
-	return spreadsheetIDMatches[1], int32(gid), nil
 }

@@ -294,3 +294,7 @@ func (ggd *GoogleDrive) createDirectory(ctx context.Context, parentID, name stri
 func (ggd *GoogleDrive) PublicURL(ctx context.Context, fileID string) string {
 	return fmt.Sprintf("https://drive.google.com/file/d/%s/view", fileID)
 }
+
+func FileID(url string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(url, "https://drive.google.com/file/d/"), "/view")
+}

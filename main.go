@@ -93,8 +93,9 @@ func main() {
 	jwtService := service.NewJWTService(cfg.App.JWTKey, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
 	authenService := service.NewAuthenService(userRepository, cacheRepository, jwtService, firebaseAuthen)
 	userService := service.NewUserService(userRepository, firebaseAuthen, cloudStorage)
-	warehouseService := service.NewWarehouseService(warehouseRepository, userRepository, medicineRepository, firebaseAuthen, cloudStorage, googleDrive, sheet)
+	warehouseService := service.NewWarehouseService(warehouseRepository, userRepository, medicineRepository, cloudStorage)
 	medicineService := service.NewMedicineService(medicineRepository, warehouseRepository, googleDrive)
+	sheetService := service.NewSheetService(warehouseRepository, medicineRepository, googleDrive, sheet)
 
 	http.NewHealthzHandler(httpServer.Routers(), pgPool, redisClient)
 	http.NewDriveHandler(httpServer.Routers(), validate, googleDrive)
@@ -102,6 +103,7 @@ func main() {
 	http.NewUserHandler(httpServer.Routers(), validate, userService)
 	http.NewWarehouseHandler(httpServer.Routers(), validate, warehouseService)
 	http.NewMedicineHandler(httpServer.Routers(), validate, medicineService)
+	http.NewSheetHandler(httpServer.Routers(), validate, sheetService)
 
 	httpServer.ListenAndServe()
 	httpServer.GracefulShutdown()

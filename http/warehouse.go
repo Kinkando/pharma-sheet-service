@@ -33,8 +33,6 @@ func NewWarehouseHandler(e *echo.Echo, validate *validator.Validate, warehouseSe
 	route.POST("/:warehouseID", handler.createWarehouse)
 	route.PATCH("/:warehouseID", handler.updateWarehouse)
 	route.DELETE("/:warehouseID", handler.deleteWarehouse)
-	route.GET("/:warehouseID/sync/medicine", handler.summarizeMedicineSyncData)
-	route.PUT("/:warehouseID/sync/medicine", handler.syncMedicine)
 
 	warehouseUserRoute := route.Group("/:warehouseID/user")
 	warehouseUserRoute.GET("", handler.getWarehouseUsers)
@@ -178,52 +176,6 @@ func (h *WarehouseHandler) deleteWarehouse(c echo.Context) error {
 	}
 
 	err := h.warehouseService.DeleteWarehouse(ctx, req.WarehouseID)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
-	}
-
-	return c.NoContent(http.StatusNoContent)
-}
-
-func (h *WarehouseHandler) summarizeMedicineSyncData(c echo.Context) error {
-	ctx := c.Request().Context()
-
-	var req model.GetSyncMedicineMetadataRequest
-	if err := c.Bind(&req); err != nil {
-		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
-
-	if err := h.validate.Struct(req); err != nil {
-		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
-
-	data, err := h.warehouseService.SummarizeMedicineFromGoogleSheet(ctx, req)
-	if err != nil {
-		logger.Context(ctx).Error(err)
-		return err
-	}
-
-	return c.JSON(http.StatusOK, data)
-}
-
-func (h *WarehouseHandler) syncMedicine(c echo.Context) error {
-	ctx := c.Request().Context()
-
-	var req model.SyncMedicineRequest
-	if err := c.Bind(&req); err != nil {
-		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
-
-	if err := h.validate.Struct(req); err != nil {
-		logger.Context(ctx).Error(err)
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
-	}
-
-	err := h.warehouseService.SyncMedicineFromGoogleSheet(ctx, req)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return err

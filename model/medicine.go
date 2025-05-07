@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"mime/multipart"
 	"time"
 
@@ -28,6 +29,10 @@ type MedicineBrand struct {
 	MedicalName *string `json:"medicalName,omitempty"`
 }
 
+func (m MedicineBrand) ExternalID() string {
+	return m.MedicationID + "-" + m.TradeID
+}
+
 type MedicineHouse struct {
 	ID           uuid.UUID `json:"id"`
 	MedicationID string    `json:"medicationID,omitempty"`
@@ -42,9 +47,17 @@ type MedicineHouse struct {
 	MedicalName   *string `json:"medicalName,omitempty"`
 }
 
+func (m MedicineHouse) Address() string {
+	return fmt.Sprintf("%s-%d-%d", m.Locker, m.Floor, m.No)
+}
+
+func (m MedicineHouse) ExternalID() string {
+	return m.WarehouseID + "-" + m.MedicationID + "-" + m.Address()
+}
+
 type MedicineBlisterDateHistory struct {
 	ID                uuid.UUID  `json:"id"`
-	MedicationID      *string    `json:"medicationID,omitempty"`
+	MedicationID      string     `json:"medicationID,omitempty"`
 	WarehouseID       string     `json:"warehouseID"`
 	BrandID           *uuid.UUID `json:"brandID,omitempty"`
 	TradeID           *string    `json:"tradeID,omitempty"`
@@ -53,6 +66,15 @@ type MedicineBlisterDateHistory struct {
 	// JOIN ONLY
 	WarehouseName *string `json:"warehouseName,omitempty"`
 	TradeName     *string `json:"tradeName,omitempty"`
+}
+
+func (m MedicineBlisterDateHistory) ExternalID() string {
+	id := m.WarehouseID + "-" + m.MedicationID
+	if m.TradeID != nil && *m.TradeID != "" {
+		id += "-" + *m.TradeID
+	}
+	id += "-" + m.BlisterChangeDate.Format(time.DateOnly)
+	return id
 }
 
 type MedicineView struct {
@@ -215,6 +237,7 @@ type DeleteMedicineBrandFilter struct {
 type FilterMedicineBrandBlisterDateHistory struct {
 	BrandID      *uuid.UUID
 	MedicationID *string
+	WarehouseID  *string
 }
 
 type MedicineBlisterDateHistoryGroup struct {
@@ -241,35 +264,4 @@ type DeleteMedicineBlisterChangeDateHistoryRequest struct {
 	MedicationID *string    `param:"medicationID"`
 	WarehouseID  *string    `param:"warehouseID"`
 	BrandID      *uuid.UUID `param:"brandID" validate:"omitempty,uuid"`
-}
-
-// TODO: temporary struct for medicine sheet
-type MedicineSheet struct {
-	MedicationID string `csv:"รหัส" json:"medicationID"`
-	LockerName   string `csv:"ตู้" json:"lockerName"`
-	Floor        int32  `csv:"ชั้น" json:"floor"`
-	No           int32  `csv:"ลำดับที่" json:"no"`
-	Address      string `csv:"บ้านเลขที่ยา" json:"address"`
-	Description  string `csv:"ชื่อสามัญทางยา" json:"description"`
-	MedicalName  string `csv:"ชื่อการค้า" json:"medicalName,omitempty"`
-	Label        string `csv:"Label ตะกร้า" json:"label,omitempty"`
-}
-
-func (m *MedicineSheet) IsDifferent(medicineReq Medicine, isSyncUniqueByID bool) bool {
-	panic("TODO: implement me")
-	// medicine := MedicineSheet{
-	// 	LockerName:  m.LockerName,
-	// 	Floor:       medicineReq.Floor,
-	// 	No:          medicineReq.No,
-	// 	Address:     medicineReq.Address,
-	// 	Description: medicineReq.Description,
-	// 	MedicalName: medicineReq.MedicalName,
-	// 	Label:       medicineReq.Label,
-	// }
-	// if isSyncUniqueByID || m.MedicationID != "" {
-	// 	medicine.MedicationID = medicineReq.MedicationID
-	// }
-	// d1, _ := json.Marshal(medicine)
-	// d2, _ := json.Marshal(m)
-	// return string(d1) != string(d2)
 }

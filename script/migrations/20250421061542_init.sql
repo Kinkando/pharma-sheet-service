@@ -101,8 +101,7 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_warehouse_sheets (
   medicine_blister_date_history_sheet_name TEXT NOT NULL,
   latest_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id) ON DELETE CASCADE,
-  CONSTRAINT unique_pharma_sheet_warehouse_sheet UNIQUE (spreadsheet_id, medicine_sheet_id, medicine_brand_sheet_id, medicine_house_sheet_id, medicine_blister_date_history_sheet_id)
+  CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id) ON DELETE CASCADE
 )
 
 -- migrate:down

@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
@@ -18,9 +20,8 @@ import (
 )
 
 const (
-	idTypeMedicine    = "MEDICINE"
-	idTypeWarehouse   = "WAREHOUSE"
-	medicineDirectory = "medicines"
+	idTypeMedicine  = "MEDICINE"
+	idTypeWarehouse = "WAREHOUSE"
 )
 
 type Medicine interface {
@@ -318,7 +319,8 @@ func (s *medicine) GetMedicineBrands(ctx context.Context, filter model.FilterMed
 
 func (s *medicine) CreateMedicineBrand(ctx context.Context, req model.CreateMedicineBrandRequest) (string, error) {
 	if req.BlisterImageFile != nil {
-		id, err := s.storage.UploadMultipart(ctx, medicineDirectory+"/"+req.MedicationID, req.BlisterImageFile)
+		resolveFileName("แผงยา", req.BlisterImageFile)
+		id, err := s.storage.UploadMultipart(ctx, "รูปภาพยา/แผงยา", req.BlisterImageFile)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return "", echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -327,7 +329,8 @@ func (s *medicine) CreateMedicineBrand(ctx context.Context, req model.CreateMedi
 	}
 
 	if req.TabletImageFile != nil {
-		id, err := s.storage.UploadMultipart(ctx, medicineDirectory+"/"+req.MedicationID, req.TabletImageFile)
+		resolveFileName("เม็ดยา", req.TabletImageFile)
+		id, err := s.storage.UploadMultipart(ctx, "รูปภาพยา/เม็ดยา", req.TabletImageFile)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return "", echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -336,7 +339,8 @@ func (s *medicine) CreateMedicineBrand(ctx context.Context, req model.CreateMedi
 	}
 
 	if req.BoxImageFile != nil {
-		id, err := s.storage.UploadMultipart(ctx, medicineDirectory+"/"+req.MedicationID, req.BoxImageFile)
+		resolveFileName("กล่องยา", req.BoxImageFile)
+		id, err := s.storage.UploadMultipart(ctx, "รูปภาพยา/กล่องยา", req.BoxImageFile)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return "", echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -369,7 +373,8 @@ func (s *medicine) UpdateMedicineBrand(ctx context.Context, req model.UpdateMedi
 	brand := brands[0]
 
 	if req.BlisterImageFile != nil {
-		id, err := s.storage.UploadMultipart(ctx, medicineDirectory+"/"+brand.MedicationID, req.BlisterImageFile)
+		resolveFileName("แผงยา", req.BlisterImageFile)
+		id, err := s.storage.UploadMultipart(ctx, "รูปภาพยา/แผงยา", req.BlisterImageFile)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -379,7 +384,8 @@ func (s *medicine) UpdateMedicineBrand(ctx context.Context, req model.UpdateMedi
 	}
 
 	if req.TabletImageFile != nil {
-		id, err := s.storage.UploadMultipart(ctx, medicineDirectory+"/"+brand.MedicationID, req.TabletImageFile)
+		resolveFileName("เม็ดยา", req.TabletImageFile)
+		id, err := s.storage.UploadMultipart(ctx, "รูปภาพยา/เม็ดยา", req.TabletImageFile)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -389,7 +395,8 @@ func (s *medicine) UpdateMedicineBrand(ctx context.Context, req model.UpdateMedi
 	}
 
 	if req.BoxImageFile != nil {
-		id, err := s.storage.UploadMultipart(ctx, medicineDirectory+"/"+brand.MedicationID, req.BoxImageFile)
+		resolveFileName("กล่องยา", req.BoxImageFile)
+		id, err := s.storage.UploadMultipart(ctx, "รูปภาพยา/กล่องยา", req.BoxImageFile)
 		if err != nil {
 			logger.Context(ctx).Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -622,4 +629,10 @@ func (s *medicine) injectMedicineBrandImageURL(ctx context.Context, medicineBran
 		medicineBrand.BoxImageURL = &url
 	}
 	return medicineBrand
+}
+
+func resolveFileName(prefix string, file *multipart.FileHeader) {
+	if !strings.HasPrefix(file.Filename, prefix+"_") {
+		file.Filename = prefix + "_" + file.Filename
+	}
 }

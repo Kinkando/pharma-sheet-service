@@ -38,6 +38,7 @@ type Medicine interface {
 	DeleteMedicineHouse(ctx context.Context, filter model.DeleteMedicineHouseFilter) (int64, error)
 
 	GetMedicineBrands(ctx context.Context, req model.FilterMedicineBrand) ([]model.MedicineBrand, error)
+	ListMedicineBrands(ctx context.Context) ([]model.MedicineBrand, error)
 	GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.Medicine, total uint64, err error)
 	GetMedicineBrandsPagination(ctx context.Context, filter model.FilterMedicineWithBrand) (data []model.MedicineBrand, total uint64, err error)
 	CreateMedicineBrand(ctx context.Context, req model.CreateMedicineBrandRequest) (string, error)
@@ -843,6 +844,9 @@ func (r *medicine) CreateMedicineHouse(ctx context.Context, req model.CreateMedi
 	medicineHouses := table.PharmaSheetMedicineHouses
 
 	now := time.Now()
+	if req.Label != nil && *req.Label == "" {
+		req.Label = nil
+	}
 	medicineHouse := genmodel.PharmaSheetMedicineHouses{
 		ID:           uuid.MustParse(generator.UUID()),
 		MedicationID: req.MedicationID,
@@ -959,6 +963,47 @@ func (r *medicine) GetMedicineBrands(ctx context.Context, req model.FilterMedici
 		).
 		WHERE(condition).
 		GROUP_BY(
+			table.PharmaSheetMedicineBrands.ID,
+			table.PharmaSheetMedicineBrands.MedicationID,
+			table.PharmaSheetMedicineBrands.TradeID,
+			table.PharmaSheetMedicineBrands.TradeName,
+			table.PharmaSheetMedicineBrands.BlisterImageURL,
+			table.PharmaSheetMedicineBrands.TabletImageURL,
+			table.PharmaSheetMedicineBrands.BoxImageURL,
+		).
+		Sql()
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var brand model.MedicineBrand
+		err = rows.Scan(
+			&brand.ID,
+			&brand.MedicationID,
+			&brand.TradeID,
+			&brand.TradeName,
+			&brand.BlisterImageURL,
+			&brand.TabletImageURL,
+			&brand.BoxImageURL,
+		)
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, err
+		}
+		brands = append(brands, brand)
+	}
+
+	return brands, nil
+}
+
+func (r *medicine) ListMedicineBrands(ctx context.Context) (brands []model.MedicineBrand, err error) {
+	query, args := table.PharmaSheetMedicineBrands.
+		SELECT(
 			table.PharmaSheetMedicineBrands.ID,
 			table.PharmaSheetMedicineBrands.MedicationID,
 			table.PharmaSheetMedicineBrands.TradeID,
@@ -1200,6 +1245,9 @@ func (r *medicine) CreateMedicineBrand(ctx context.Context, req model.CreateMedi
 	medicineBrands := table.PharmaSheetMedicineBrands
 
 	now := time.Now()
+	if req.TradeName != nil && *req.TradeName == "" {
+		req.TradeName = nil
+	}
 	medicineBrand := genmodel.PharmaSheetMedicineBrands{
 		ID:              uuid.MustParse(generator.UUID()),
 		TradeID:         req.TradeID,
@@ -1242,7 +1290,7 @@ func (r *medicine) UpdateMedicineBrand(ctx context.Context, req model.UpdateMedi
 	columnNames := postgres.ColumnList{medicineBrands.UpdatedAt, medicineBrands.TradeName}
 	columnValues := []any{postgres.TimestampzT(time.Now())}
 
-	if req.TradeName != nil {
+	if req.TradeName != nil && *req.TradeName != "" {
 		columnValues = append(columnValues, *req.TradeName)
 	} else {
 		columnValues = append(columnValues, postgres.NULL)
@@ -1340,8 +1388,15 @@ func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, fil
 		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(*filter.MedicationID)))
 		validCondition = true
 	}
-	if filter.BrandID != nil {
+	if filter.WarehouseID != nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(postgres.String(*filter.WarehouseID)))
+		validCondition = true
+	}
+	if filter.BrandID != nil && *filter.BrandID != uuid.Nil {
 		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.IS_NOT_NULL()).AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(filter.BrandID)))
+		validCondition = true
+	} else if filter.BrandID != nil && *filter.BrandID == uuid.Nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.IS_NULL())
 		validCondition = true
 	}
 	if !validCondition {
@@ -1349,12 +1404,14 @@ func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, fil
 	}
 
 	query, args := table.PharmaSheetMedicineBlisterDateHistories.
+		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicineBrands.ID.EQ(table.PharmaSheetMedicineBlisterDateHistories.BrandID)).
 		SELECT(
 			table.PharmaSheetMedicineBlisterDateHistories.ID,
 			table.PharmaSheetMedicineBlisterDateHistories.WarehouseID,
 			table.PharmaSheetMedicineBlisterDateHistories.MedicationID,
 			table.PharmaSheetMedicineBlisterDateHistories.BrandID,
 			table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate,
+			table.PharmaSheetMedicineBrands.TradeID,
 		).
 		WHERE(condition).
 		Sql()
@@ -1375,6 +1432,7 @@ func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, fil
 			&medicineBlisterDateHistory.MedicationID,
 			&medicineBlisterDateHistory.BrandID,
 			&medicineBlisterDateHistory.BlisterChangeDate,
+			&medicineBlisterDateHistory.TradeID,
 		)
 		if err != nil {
 			logger.Context(ctx).Error(err)

@@ -111,9 +111,13 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 			table.PharmaSheetWarehouses.Name,
 			table.PharmaSheetWarehouseUsers.Role,
 			table.PharmaSheetWarehouseSheets.SpreadsheetID,
+			table.PharmaSheetWarehouseSheets.MedicineSheetID,
 			table.PharmaSheetWarehouseSheets.MedicineSheetName,
+			table.PharmaSheetWarehouseSheets.MedicineBrandSheetID,
 			table.PharmaSheetWarehouseSheets.MedicineHouseSheetName,
+			table.PharmaSheetWarehouseSheets.MedicineHouseSheetID,
 			table.PharmaSheetWarehouseSheets.MedicineBrandSheetName,
+			table.PharmaSheetWarehouseSheets.MedicineBlisterDateHistorySheetID,
 			table.PharmaSheetWarehouseSheets.MedicineBlisterDateHistorySheetName,
 			table.PharmaSheetWarehouseSheets.LatestSyncedAt,
 		).
@@ -137,9 +141,13 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 			&warehouse.Name,
 			&warehouse.Role,
 			&spreadsheetID,
+			&warehouse.MedicineSheetID,
 			&warehouse.MedicineSheetName,
+			&warehouse.MedicineHouseSheetID,
 			&warehouse.MedicineHouseSheetName,
+			&warehouse.MedicineBrandSheetID,
 			&warehouse.MedicineBrandSheetName,
+			&warehouse.MedicineBlisterDateHistorySheetID,
 			&warehouse.MedicineBlisterDateHistorySheetName,
 			&warehouse.LatestSyncedAt,
 		)
@@ -148,8 +156,8 @@ func (r *warehouse) GetWarehouses(ctx context.Context) (warehouses []model.Wareh
 			return nil, err
 		}
 
-		if spreadsheetID != nil {
-			sheetURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit", *spreadsheetID)
+		if spreadsheetID != nil && warehouse.MedicineSheetID != nil {
+			sheetURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit?gid=%d", *spreadsheetID, *warehouse.MedicineSheetID)
 			warehouse.SheetURL = &sheetURL
 		}
 		warehouses = append(warehouses, warehouse)
@@ -551,47 +559,70 @@ func (r *warehouse) DeleteWarehouseUser(ctx context.Context, warehouseID string,
 }
 
 func (r *warehouse) CheckConflictWarehouseSheet(ctx context.Context, warehouseID string, spreadsheetID string, sheetID int32) (bool, error) {
-	panic("TODO: implement me!")
-	// query, args := table.PharmaSheetWarehouseSheets.
-	// 	SELECT(postgres.COUNT(postgres.STAR)).
-	// 	WHERE(
-	// 		table.PharmaSheetWarehouseSheets.WarehouseID.NOT_EQ(postgres.UUID(warehouseID)).AND(
-	// 			table.PharmaSheetWarehouseSheets.SpreadsheetID.EQ(postgres.String(spreadsheetID)).AND(
-	// 				table.PharmaSheetWarehouseSheets.SheetID.EQ(postgres.Int32(sheetID))))).
-	// 	Sql()
+	query, args := table.PharmaSheetWarehouseSheets.
+		SELECT(postgres.COUNT(postgres.STAR)).
+		WHERE(table.PharmaSheetWarehouseSheets.WarehouseID.NOT_EQ(postgres.String(warehouseID)).AND(
+			table.PharmaSheetWarehouseSheets.SpreadsheetID.EQ(postgres.String(spreadsheetID))).AND(
+			postgres.OR(
+				table.PharmaSheetWarehouseSheets.MedicineSheetID.EQ(postgres.Int32(sheetID)),
+				table.PharmaSheetWarehouseSheets.MedicineBrandSheetID.EQ(postgres.Int32(sheetID)),
+				table.PharmaSheetWarehouseSheets.MedicineHouseSheetID.EQ(postgres.Int32(sheetID)),
+				table.PharmaSheetWarehouseSheets.MedicineBlisterDateHistorySheetID.EQ(postgres.Int32(sheetID)),
+			))).
+		Sql()
 
-	// var count uint64
-	// err := r.pgPool.QueryRow(ctx, query, args...).Scan(&count)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return false, err
-	// }
+	var count uint64
+	err := r.pgPool.QueryRow(ctx, query, args...).Scan(&count)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return false, err
+	}
 
-	// return count > 0, nil
+	return count > 0, nil
 }
 
 func (r *warehouse) UpsertWarehouseSheet(ctx context.Context, warehouseSheet genmodel.PharmaSheetWarehouseSheets) error {
-	panic("TODO: implement me!")
-	// warehouseSheet.LatestSyncedAt = time.Now()
-	// warehouseSheet.CreatedAt = time.Now()
+	now := time.Now()
+	warehouseSheet.LatestSyncedAt = now
+	warehouseSheet.CreatedAt = now
 
-	// stmt, args := table.PharmaSheetWarehouseSheets.
-	// 	INSERT(table.PharmaSheetWarehouseSheets.WarehouseID, table.PharmaSheetWarehouseSheets.SpreadsheetID, table.PharmaSheetWarehouseSheets.SheetID, table.PharmaSheetWarehouseSheets.LatestSyncedAt, table.PharmaSheetWarehouseSheets.CreatedAt).
-	// 	MODEL(warehouseSheet).
-	// 	ON_CONFLICT(table.PharmaSheetWarehouseSheets.WarehouseID).
-	// 	DO_UPDATE(postgres.SET(
-	// 		table.PharmaSheetWarehouseSheets.SpreadsheetID.SET(postgres.String(warehouseSheet.SpreadsheetID)),
-	// 		table.PharmaSheetWarehouseSheets.SheetID.SET(postgres.Int32(warehouseSheet.SheetID)),
-	// 		table.PharmaSheetWarehouseSheets.LatestSyncedAt.SET(postgres.TimestampzT(time.Now())),
-	// 	)).
-	// 	Sql()
-	// _, err := r.pgPool.Exec(ctx, stmt, args...)
-	// if err != nil {
-	// 	logger.Context(ctx).Error(err)
-	// 	return err
-	// }
+	stmt, args := table.PharmaSheetWarehouseSheets.
+		INSERT(
+			table.PharmaSheetWarehouseSheets.WarehouseID,
+			table.PharmaSheetWarehouseSheets.SpreadsheetID,
+			table.PharmaSheetWarehouseSheets.MedicineSheetID,
+			table.PharmaSheetWarehouseSheets.MedicineSheetName,
+			table.PharmaSheetWarehouseSheets.MedicineBrandSheetID,
+			table.PharmaSheetWarehouseSheets.MedicineBrandSheetName,
+			table.PharmaSheetWarehouseSheets.MedicineHouseSheetID,
+			table.PharmaSheetWarehouseSheets.MedicineHouseSheetName,
+			table.PharmaSheetWarehouseSheets.MedicineBlisterDateHistorySheetID,
+			table.PharmaSheetWarehouseSheets.MedicineBlisterDateHistorySheetName,
+			table.PharmaSheetWarehouseSheets.LatestSyncedAt,
+			table.PharmaSheetWarehouseSheets.CreatedAt,
+		).
+		MODEL(warehouseSheet).
+		ON_CONFLICT(table.PharmaSheetWarehouseSheets.WarehouseID).
+		DO_UPDATE(postgres.SET(
+			table.PharmaSheetWarehouseSheets.SpreadsheetID.SET(postgres.String(warehouseSheet.SpreadsheetID)),
+			table.PharmaSheetWarehouseSheets.MedicineSheetID.SET(postgres.Int32(warehouseSheet.MedicineSheetID)),
+			table.PharmaSheetWarehouseSheets.MedicineSheetName.SET(postgres.String(warehouseSheet.MedicineSheetName)),
+			table.PharmaSheetWarehouseSheets.MedicineBrandSheetID.SET(postgres.Int32(warehouseSheet.MedicineBrandSheetID)),
+			table.PharmaSheetWarehouseSheets.MedicineBrandSheetName.SET(postgres.String(warehouseSheet.MedicineBrandSheetName)),
+			table.PharmaSheetWarehouseSheets.MedicineHouseSheetID.SET(postgres.Int32(warehouseSheet.MedicineHouseSheetID)),
+			table.PharmaSheetWarehouseSheets.MedicineHouseSheetName.SET(postgres.String(warehouseSheet.MedicineHouseSheetName)),
+			table.PharmaSheetWarehouseSheets.MedicineBlisterDateHistorySheetID.SET(postgres.Int32(warehouseSheet.MedicineBlisterDateHistorySheetID)),
+			table.PharmaSheetWarehouseSheets.MedicineBlisterDateHistorySheetName.SET(postgres.String(warehouseSheet.MedicineBlisterDateHistorySheetName)),
+			table.PharmaSheetWarehouseSheets.LatestSyncedAt.SET(postgres.TimestampzT(now)),
+		)).
+		Sql()
+	_, err := r.pgPool.Exec(ctx, stmt, args...)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return err
+	}
 
-	// return nil
+	return nil
 }
 
 func (r *warehouse) DeleteWarehouseSheet(ctx context.Context, warehouseID string) error {
