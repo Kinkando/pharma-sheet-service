@@ -1,12 +1,18 @@
 package model
 
-import "math"
+import (
+	"math"
+	"strings"
+
+	"github.com/kinkando/pharma-sheet-service/pkg/util"
+)
 
 type Pagination struct {
 	Limit  uint64  `json:"limit" query:"limit"`
 	Offset uint64  `json:"offset" query:"offset"`
 	Page   uint64  `json:"page" query:"page"`
 	Sort   *string `json:"sort" query:"sort"`
+	Search string  `json:"-" query:"search"`
 }
 
 func (p *Pagination) AssignDefault() {
@@ -16,6 +22,19 @@ func (p *Pagination) AssignDefault() {
 	if p.Page > 0 {
 		p.Offset = (p.Page - 1) * p.Limit
 	}
+}
+
+func (p *Pagination) SortBy(sortBy string) string {
+	if p.Sort == nil || *p.Sort == "" {
+		return sortBy
+	}
+	if sorts := strings.Split(*p.Sort, " "); p.Sort != nil && *p.Sort != "" && len(sorts) == 2 {
+		sortBy = util.CamelToSnake(strings.ReplaceAll(sorts[0], "ID", "Id")) + " " + sorts[1]
+	}
+	if !strings.HasSuffix(strings.ToUpper(sortBy), " ASC") && !strings.HasSuffix(strings.ToUpper(sortBy), " DESC") {
+		sortBy = strings.Split(*p.Sort, " ")[0] + " ASC"
+	}
+	return sortBy
 }
 
 type PagingWithMetadata[T any] struct {

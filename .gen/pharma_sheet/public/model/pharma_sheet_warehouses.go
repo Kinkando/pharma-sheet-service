@@ -8,16 +8,12 @@
 package model
 
 import (
-	"github.com/google/uuid"
 	"time"
 )
 
-type PharmaSheetUsers struct {
-	UserID      uuid.UUID `sql:"primary_key"`
-	FirebaseUID *string
-	Email       string
-	DisplayName *string
-	ImageURL    *string
+type PharmaSheetWarehouses struct {
+	WarehouseID string `sql:"primary_key"`
+	Name        string
 	CreatedAt   time.Time
-	UpdatedAt   *time.Time
+	UpdatedAt   time.Time
 }

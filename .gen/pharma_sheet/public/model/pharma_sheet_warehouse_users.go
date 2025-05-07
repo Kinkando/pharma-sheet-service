@@ -13,10 +13,10 @@ import (
 )
 
 type PharmaSheetWarehouseUsers struct {
-	WarehouseID uuid.UUID
+	WarehouseID string
 	UserID      uuid.UUID
 	Role        PharmaSheetRole
 	Status      PharmaSheetApprovalStatus
 	CreatedAt   time.Time
-	UpdatedAt   *time.Time
+	UpdatedAt   time.Time
 }

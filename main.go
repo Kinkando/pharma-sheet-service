@@ -55,6 +55,8 @@ func main() {
 	cloudStorage := google.NewStorage([]byte(cfg.Google.FirebaseCredential), cfg.Google.Storage.BucketName, cfg.Google.Storage.ExpiredTime)
 	defer cloudStorage.Shutdown()
 
+	googleDrive := google.NewGoogleDrive([]byte(cfg.Google.FirebaseCredential), cfg.Google.DriveRootFolderID)
+
 	sheet := google.NewSheet(
 		option.WithGoogleSheetClientCredentialJSON([]byte(cfg.Google.FirebaseCredential)),
 		option.WithGoogleSheetClientRateLimiter(ratelimit.New(60, ratelimit.Per(time.Minute))), // but 20 requests per minute is ensured
@@ -68,6 +70,7 @@ func main() {
 		httpserver.WithPort(cfg.App.Port),
 		httpserver.WithMiddlewares([]echo.MiddlewareFunc{
 			httpmiddleware.RequestID,
+			httpmiddleware.Host,
 			httpmiddleware.NewProfileProvider(
 				cfg.App.JWTKey,
 				redisClient,
@@ -77,6 +80,7 @@ func main() {
 				"GET /readyz",
 				"POST /auth/token/verify",
 				"POST /auth/token/refresh",
+				"GET /file/*",
 			),
 		}),
 	)
@@ -84,20 +88,22 @@ func main() {
 	userRepository := repository.NewUserRepository(pgPool)
 	cacheRepository := repository.NewCacheRepository(redisClient, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
 	warehouseRepository := repository.NewWarehouseRepository(pgPool)
-	lockerRepository := repository.NewLockerRepository(pgPool)
 	medicineRepository := repository.NewMedicineRepository(pgPool)
 
 	jwtService := service.NewJWTService(cfg.App.JWTKey, cfg.App.AccessTokenExpired, cfg.App.RefreshTokenExpired)
 	authenService := service.NewAuthenService(userRepository, cacheRepository, jwtService, firebaseAuthen)
 	userService := service.NewUserService(userRepository, firebaseAuthen, cloudStorage)
-	warehouseService := service.NewWarehouseService(warehouseRepository, lockerRepository, userRepository, medicineRepository, firebaseAuthen, cloudStorage, sheet)
-	medicineService := service.NewMedicineService(medicineRepository, warehouseRepository, cloudStorage)
+	warehouseService := service.NewWarehouseService(warehouseRepository, userRepository, medicineRepository, cloudStorage)
+	medicineService := service.NewMedicineService(medicineRepository, warehouseRepository, googleDrive)
+	sheetService := service.NewSheetService(warehouseRepository, medicineRepository, googleDrive, sheet)
 
 	http.NewHealthzHandler(httpServer.Routers(), pgPool, redisClient)
+	http.NewDriveHandler(httpServer.Routers(), validate, googleDrive)
 	http.NewAuthenHandler(httpServer.Routers(), validate, cfg.App.APIKey, authenService)
 	http.NewUserHandler(httpServer.Routers(), validate, userService)
 	http.NewWarehouseHandler(httpServer.Routers(), validate, warehouseService)
 	http.NewMedicineHandler(httpServer.Routers(), validate, medicineService)
+	http.NewSheetHandler(httpServer.Routers(), validate, sheetService)
 
 	httpServer.ListenAndServe()
 	httpServer.GracefulShutdown()
