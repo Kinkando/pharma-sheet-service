@@ -325,6 +325,11 @@ func (h *MedicineHandler) createMedicineBrand(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
+	if req.TradeID == "-" {
+		logger.Context(ctx).Error("tradeID is invalid")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "tradeID is invalid"})
+	}
+
 	if req.TradeName != nil && *req.TradeName == "" {
 		req.TradeName = nil
 	}

@@ -207,7 +207,7 @@ func (m *MedicineBlisterDateSheet) IsDifferent(req MedicineBlisterDateHistory) b
 	reqDate := req.BlisterChangeDate.Format(DateLayout)
 	return m.MedicationID != req.MedicationID ||
 		m.WarehouseID != req.WarehouseID ||
-		m.TradeID != util.Value(req.TradeID) ||
+		m.TradeID != req.TradeID ||
 		date.Format(DateLayout) != reqDate
 }
 
@@ -219,12 +219,5 @@ func (m *MedicineBlisterDateSheet) IsInvalid() bool {
 
 func (m *MedicineBlisterDateSheet) ExternalID() string {
 	date, _ := time.Parse(DateLayout, m.BlisterDate)
-	id := m.WarehouseID + "-" + m.MedicationID
-	if m.TradeID != "" {
-		id += "-" + m.TradeID
-	}
-	if !date.IsZero() {
-		id += "-" + date.Format(time.DateOnly)
-	}
-	return id
+	return m.WarehouseID + "-" + m.MedicationID + "-" + m.TradeID + "-" + date.Format(time.DateOnly)
 }

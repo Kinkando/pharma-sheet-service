@@ -372,6 +372,11 @@ func (s *medicine) UpdateMedicineBrand(ctx context.Context, req model.UpdateMedi
 	}
 	brand := brands[0]
 
+	if brand.TradeID == "-" {
+		logger.Context(ctx).Error("brandID is invalid")
+		return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "brandID is invalid"})
+	}
+
 	if req.BlisterImageFile != nil {
 		resolveFileName("แผงยา", req.BlisterImageFile)
 		id, err := s.storage.UploadMultipart(ctx, "รูปภาพยา/แผงยา", req.BlisterImageFile)
@@ -453,6 +458,13 @@ func (s *medicine) DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return 0, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	for _, brand := range medicineBrands {
+		if brand.TradeID == "-" {
+			logger.Context(ctx).Error("brandID is invalid")
+			return 0, echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "brandID is invalid"})
+		}
 	}
 
 	forceDelete := false
