@@ -1189,6 +1189,13 @@ func (r *medicine) GetMedicineBrandsPagination(ctx context.Context, filter model
 
 	query, args = table.PharmaSheetMedicines.
 		INNER_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicines.MedicationID.EQ(table.PharmaSheetMedicineBrands.MedicationID)).
+		LEFT_JOIN(
+			table.PharmaSheetMedicineBlisterDateHistories,
+			postgres.AND(
+				table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(table.PharmaSheetMedicineBrands.MedicationID),
+				table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(table.PharmaSheetMedicineBrands.ID),
+			),
+		).
 		SELECT(
 			table.PharmaSheetMedicineBrands.ID,
 			table.PharmaSheetMedicines.MedicationID,
@@ -1198,8 +1205,10 @@ func (r *medicine) GetMedicineBrandsPagination(ctx context.Context, filter model
 			table.PharmaSheetMedicineBrands.BlisterImageURL,
 			table.PharmaSheetMedicineBrands.TabletImageURL,
 			table.PharmaSheetMedicineBrands.BoxImageURL,
+			postgres.COALESCE(postgres.COUNT(table.PharmaSheetMedicineBlisterDateHistories.ID), postgres.Int64(0)).AS("total_blister_change_date"),
 		).
 		WHERE(condition).
+		GROUP_BY(table.PharmaSheetMedicines.MedicationID, table.PharmaSheetMedicineBrands.ID).
 		LIMIT(int64(filter.Limit)).
 		OFFSET(int64(filter.Offset)).
 		ORDER_BY(postgres.Raw(sortBy)).
@@ -1223,6 +1232,7 @@ func (r *medicine) GetMedicineBrandsPagination(ctx context.Context, filter model
 			&medicine.BlisterImageURL,
 			&medicine.TabletImageURL,
 			&medicine.BoxImageURL,
+			&medicine.TotalBlisterChangeDate,
 		)
 		if err != nil {
 			logger.Context(ctx).Error(err)
@@ -1394,10 +1404,12 @@ func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, fil
 	}
 
 	query, args := table.PharmaSheetMedicineBlisterDateHistories.
+		INNER_JOIN(table.PharmaSheetWarehouses, table.PharmaSheetWarehouses.WarehouseID.EQ(table.PharmaSheetMedicineBlisterDateHistories.WarehouseID)).
 		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicineBrands.ID.EQ(table.PharmaSheetMedicineBlisterDateHistories.BrandID)).
 		SELECT(
 			table.PharmaSheetMedicineBlisterDateHistories.ID,
 			table.PharmaSheetMedicineBlisterDateHistories.WarehouseID,
+			table.PharmaSheetWarehouses.Name,
 			table.PharmaSheetMedicineBlisterDateHistories.MedicationID,
 			table.PharmaSheetMedicineBlisterDateHistories.BrandID,
 			table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate,
@@ -1419,6 +1431,7 @@ func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, fil
 		err = rows.Scan(
 			&medicineBlisterDateHistory.ID,
 			&medicineBlisterDateHistory.WarehouseID,
+			&medicineBlisterDateHistory.WarehouseName,
 			&medicineBlisterDateHistory.MedicationID,
 			&medicineBlisterDateHistory.BrandID,
 			&medicineBlisterDateHistory.BlisterChangeDate,

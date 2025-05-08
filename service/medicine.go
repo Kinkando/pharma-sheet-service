@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
@@ -17,6 +18,7 @@ import (
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/labstack/echo/v4"
+	"github.com/sourcegraph/conc/pool"
 )
 
 const (
@@ -39,7 +41,7 @@ type Medicine interface {
 	DeleteMedicineHouse(ctx context.Context, id uuid.UUID) (int64, error)
 
 	GetMedicineWithBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (model.PagingWithMetadata[model.Medicine], error)
-	GetMedicineBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (model.PagingWithMetadata[model.MedicineBrand], error)
+	GetMedicineBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (model.PagingWithMetadata[model.MedicineBrandView], error)
 	CreateMedicineBrand(ctx context.Context, req model.CreateMedicineBrandRequest) (string, error)
 	UpdateMedicineBrand(ctx context.Context, req model.UpdateMedicineBrandRequest) error
 	DeleteMedicineBrand(ctx context.Context, id uuid.UUID) (int64, error)
@@ -53,6 +55,7 @@ type medicine struct {
 	medicineRepository  repository.Medicine
 	warehouseRepository repository.Warehouse
 	storage             google.Drive
+	isSelfHostImage     bool
 }
 
 func NewMedicineService(
@@ -64,6 +67,7 @@ func NewMedicineService(
 		medicineRepository:  medicineRepository,
 		warehouseRepository: warehouseRepository,
 		storage:             storage,
+		isSelfHostImage:     false,
 	}
 }
 
@@ -302,18 +306,69 @@ func (s *medicine) GetMedicineWithBrands(ctx context.Context, filter model.Filte
 	return res, nil
 }
 
-func (s *medicine) GetMedicineBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (res model.PagingWithMetadata[model.MedicineBrand], err error) {
+func (s *medicine) GetMedicineBrands(ctx context.Context, filter model.FilterMedicineWithBrand) (res model.PagingWithMetadata[model.MedicineBrandView], err error) {
 	data, total, err := s.medicineRepository.GetMedicineBrandsPagination(ctx, filter)
 	if err != nil {
 		logger.Context(ctx).Error(err)
 		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	for index := range data {
-		data[index] = s.injectMedicineBrandImageURL(ctx, data[index])
+	conc := pool.New().WithContext(ctx)
+	historyMap := make(map[uuid.UUID]map[string]model.MedicineBrandViewWithBlisterDate)
+	for _, data := range data {
+		data := data
+		if data.TotalBlisterChangeDate == 0 {
+			continue
+		}
+		conc.Go(func(ctx context.Context) error {
+			histories, err := s.medicineRepository.ListMedicineBlisterChangeDateHistory(ctx, model.FilterMedicineBrandBlisterDateHistory{BrandID: &data.ID, MedicationID: &data.MedicationID})
+			if err != nil {
+				logger.Context(ctx).Error(err)
+				return err
+			}
+
+			historyWarehouseMap := make(map[string]model.MedicineBrandViewWithBlisterDate)
+			for _, history := range histories {
+				date := history.BlisterChangeDate.Format(time.DateOnly)
+				if h, ok := historyWarehouseMap[history.WarehouseID]; !ok || h.Date < date {
+					historyWarehouseMap[history.WarehouseID] = model.MedicineBrandViewWithBlisterDate{
+						WarehouseID:   history.WarehouseID,
+						WarehouseName: history.WarehouseName,
+						Date:          date,
+					}
+				}
+			}
+
+			historyMap[data.ID] = historyWarehouseMap
+			return nil
+		})
+	}
+	if err = conc.Wait(); err != nil {
+		return res, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
-	res = model.PaginationResponse(data, filter.Pagination, total)
+	var result []model.MedicineBrandView
+	for index := range data {
+		var blisterDates []model.MedicineBrandViewWithBlisterDate
+		for _, history := range historyMap[data[index].ID] {
+			blisterDates = append(blisterDates, history)
+		}
+
+		data[index] = s.injectMedicineBrandImageURL(ctx, data[index])
+		result = append(result, model.MedicineBrandView{
+			ID:              data[index].ID,
+			MedicationID:    data[index].MedicationID,
+			MedicalName:     data[index].MedicalName,
+			TradeID:         data[index].TradeID,
+			TradeName:       data[index].TradeName,
+			BlisterImageURL: data[index].BlisterImageURL,
+			TabletImageURL:  data[index].TabletImageURL,
+			BoxImageURL:     data[index].BoxImageURL,
+			BlisterDates:    blisterDates,
+		})
+	}
+
+	res = model.PaginationResponse(result, filter.Pagination, total)
 	return res, nil
 }
 
@@ -608,39 +663,31 @@ func (s *medicine) checkWarehouseManagementRole(ctx context.Context, id string, 
 }
 
 func (s *medicine) injectMedicineImageURL(ctx context.Context, medicine model.Medicine) model.Medicine {
-	host := ctx.Value("host").(string)
-	for index, brand := range medicine.Brands {
-		if brand.BlisterImageURL != nil {
-			url := host + "/file/" + *brand.BlisterImageURL
-			medicine.Brands[index].BlisterImageURL = &url
-		}
-		if brand.TabletImageURL != nil {
-			url := host + "/file/" + *brand.TabletImageURL
-			medicine.Brands[index].TabletImageURL = &url
-		}
-		if brand.BoxImageURL != nil {
-			url := host + "/file/" + *brand.BoxImageURL
-			medicine.Brands[index].BoxImageURL = &url
-		}
+	for index := range medicine.Brands {
+		medicine.Brands[index].BlisterImageURL = s.imageURL(ctx, medicine.Brands[index].BlisterImageURL)
+		medicine.Brands[index].TabletImageURL = s.imageURL(ctx, medicine.Brands[index].TabletImageURL)
+		medicine.Brands[index].BoxImageURL = s.imageURL(ctx, medicine.Brands[index].BoxImageURL)
 	}
 	return medicine
 }
 
 func (s *medicine) injectMedicineBrandImageURL(ctx context.Context, medicineBrand model.MedicineBrand) model.MedicineBrand {
-	host := ctx.Value("host").(string)
-	if medicineBrand.BlisterImageURL != nil {
-		url := host + "/file/" + *medicineBrand.BlisterImageURL
-		medicineBrand.BlisterImageURL = &url
-	}
-	if medicineBrand.TabletImageURL != nil {
-		url := host + "/file/" + *medicineBrand.TabletImageURL
-		medicineBrand.TabletImageURL = &url
-	}
-	if medicineBrand.BoxImageURL != nil {
-		url := host + "/file/" + *medicineBrand.BoxImageURL
-		medicineBrand.BoxImageURL = &url
-	}
+	medicineBrand.BlisterImageURL = s.imageURL(ctx, medicineBrand.BlisterImageURL)
+	medicineBrand.TabletImageURL = s.imageURL(ctx, medicineBrand.TabletImageURL)
+	medicineBrand.BoxImageURL = s.imageURL(ctx, medicineBrand.BoxImageURL)
 	return medicineBrand
+}
+
+func (s *medicine) imageURL(ctx context.Context, fileID *string) *string {
+	if fileID == nil {
+		return nil
+	}
+	url := s.storage.PublicURL(ctx, *fileID)
+	if s.isSelfHostImage {
+		host := ctx.Value("host").(string)
+		url = host + "/file/" + *fileID
+	}
+	return &url
 }
 
 func resolveFileName(prefix string, file *multipart.FileHeader) {

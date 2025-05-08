@@ -26,7 +26,8 @@ type MedicineBrand struct {
 	BoxImageURL     *string   `json:"boxImageURL,omitempty"`
 
 	// JOIN ONLY
-	MedicalName *string `json:"medicalName,omitempty"`
+	MedicalName            *string `json:"medicalName,omitempty"`
+	TotalBlisterChangeDate int32   `json:"totalBlisterChangeDate,omitempty"`
 }
 
 func (m MedicineBrand) ExternalID() string {
@@ -113,6 +114,24 @@ type MedicineBrandBlisterDateHistoryView struct {
 type MedicineBrandBlisterDateDetailHistoryView struct {
 	ID   uuid.UUID `json:"id"`
 	Date string    `json:"date"`
+}
+
+type MedicineBrandView struct {
+	ID              uuid.UUID                          `json:"id"`
+	MedicationID    string                             `json:"medicationID,omitempty"`
+	MedicalName     *string                            `json:"medicalName,omitempty"`
+	TradeID         string                             `json:"tradeID"`
+	TradeName       *string                            `json:"tradeName,omitempty"`
+	BlisterImageURL *string                            `json:"blisterImageURL,omitempty"`
+	TabletImageURL  *string                            `json:"tabletImageURL,omitempty"`
+	BoxImageURL     *string                            `json:"boxImageURL,omitempty"`
+	BlisterDates    []MedicineBrandViewWithBlisterDate `json:"blisterDates,omitempty"`
+}
+
+type MedicineBrandViewWithBlisterDate struct {
+	WarehouseID   string  `json:"warehouseID"`
+	WarehouseName *string `json:"warehouseName,omitempty"`
+	Date          string  `json:"date"`
 }
 
 type FilterMedicine struct {
