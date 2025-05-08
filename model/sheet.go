@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	DateLayout = "2/1/2006"
+	DateLayout    = "2/1/2006"
+	DateAppLayout = "02/01/2006"
 )
 
 type GetSyncMedicineMetadataRequest struct {

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
@@ -329,7 +328,7 @@ func (s *medicine) GetMedicineBrands(ctx context.Context, filter model.FilterMed
 
 			historyWarehouseMap := make(map[string]model.MedicineBrandViewWithBlisterDate)
 			for _, history := range histories {
-				date := history.BlisterChangeDate.Format(time.DateOnly)
+				date := history.BlisterChangeDate.Format(model.DateAppLayout)
 				if h, ok := historyWarehouseMap[history.WarehouseID]; !ok || h.Date < date {
 					historyWarehouseMap[history.WarehouseID] = model.MedicineBrandViewWithBlisterDate{
 						WarehouseID:   history.WarehouseID,

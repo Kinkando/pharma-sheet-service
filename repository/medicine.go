@@ -297,7 +297,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 			TradeName: medicineBlisterDateHistory.TradeName,
 			BlisterChanges: []model.MedicineBrandBlisterDateDetailHistoryView{{
 				ID:   medicineBlisterDateHistory.ID,
-				Date: medicineBlisterDateHistory.BlisterChangeDate.Format(time.DateOnly),
+				Date: medicineBlisterDateHistory.BlisterChangeDate.Format(model.DateAppLayout),
 			}},
 		}
 		for historyIndex, history := range medicine.BlisterDateHistories {
@@ -1577,7 +1577,7 @@ func (r *medicine) ListMedicineBlisterChangeDateHistoryPagination(ctx context.Co
 			}
 			data[index].Histories = append(data[index].Histories, model.MedicineBrandBlisterDateDetailHistoryView{
 				ID:   history.ID,
-				Date: history.BlisterChangeDate.Format(time.DateOnly),
+				Date: history.BlisterChangeDate.Format(model.DateAppLayout),
 			})
 		}
 	}
