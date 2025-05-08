@@ -17,6 +17,7 @@ import (
 	"github.com/kinkando/pharma-sheet-service/pkg/generator"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
+	"github.com/kinkando/pharma-sheet-service/pkg/util"
 	"github.com/sourcegraph/conc/pool"
 )
 
@@ -211,7 +212,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 	query, args = table.PharmaSheetMedicineBlisterDateHistories.
 		INNER_JOIN(table.PharmaSheetWarehouses, table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(table.PharmaSheetWarehouses.WarehouseID)).
 		INNER_JOIN(table.PharmaSheetWarehouseUsers, table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(table.PharmaSheetWarehouseUsers.WarehouseID)).
-		INNER_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(table.PharmaSheetMedicineBrands.ID)).
+		LEFT_JOIN(table.PharmaSheetMedicineBrands, table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(table.PharmaSheetMedicineBrands.ID)).
 		SELECT(
 			table.PharmaSheetMedicineBlisterDateHistories.ID,
 			table.PharmaSheetMedicineBlisterDateHistories.WarehouseID,
@@ -305,7 +306,7 @@ func (r *medicine) GetMedicine(ctx context.Context, medicationID string) (medici
 				isFound = true
 				isFoundBrand := false
 				for brandIndex, brand := range history.Brands {
-					if brand.TradeID == medicineBlisterDateHistory.TradeID {
+					if util.Value(brand.TradeID) == util.Value(medicineBlisterDateHistory.TradeID) {
 						isFoundBrand = true
 						medicine.BlisterDateHistories[historyIndex].Brands[brandIndex].BlisterChanges = append(medicine.BlisterDateHistories[historyIndex].Brands[brandIndex].BlisterChanges, detail.BlisterChanges...)
 						break
@@ -1395,8 +1396,11 @@ func (r *medicine) ListMedicineBlisterChangeDateHistory(ctx context.Context, fil
 		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(postgres.String(*filter.WarehouseID)))
 		validCondition = true
 	}
-	if filter.BrandID != nil {
-		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(*filter.BrandID)))
+	if filter.BrandID != nil && *filter.BrandID != uuid.Nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.IS_NOT_NULL()).AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(filter.BrandID)))
+		validCondition = true
+	} else if filter.BrandID != nil && *filter.BrandID == uuid.Nil {
+		condition = condition.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.IS_NULL())
 		validCondition = true
 	}
 	if !validCondition {
@@ -1548,13 +1552,16 @@ func (r *medicine) ListMedicineBlisterChangeDateHistoryPagination(ctx context.Co
 	}
 
 	for index, group := range data {
+		cond := table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(postgres.String(group.WarehouseID)).AND(table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(group.MedicationID)))
+		if group.BrandID != nil {
+			cond = cond.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(group.BrandID)))
+		} else {
+			cond = cond.AND(table.PharmaSheetMedicineBlisterDateHistories.BrandID.IS_NULL())
+		}
+
 		query, args = table.PharmaSheetMedicineBlisterDateHistories.
 			SELECT(table.PharmaSheetMedicineBlisterDateHistories.ID, table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate).
-			WHERE(postgres.AND(
-				table.PharmaSheetMedicineBlisterDateHistories.WarehouseID.EQ(postgres.String(group.WarehouseID)),
-				table.PharmaSheetMedicineBlisterDateHistories.MedicationID.EQ(postgres.String(group.MedicationID)),
-				table.PharmaSheetMedicineBlisterDateHistories.BrandID.EQ(postgres.UUID(group.BrandID)),
-			)).
+			WHERE(cond).
 			ORDER_BY(table.PharmaSheetMedicineBlisterDateHistories.BlisterChangeDate).
 			Sql()
 

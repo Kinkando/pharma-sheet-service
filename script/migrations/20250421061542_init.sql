@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_medicine_blister_date_histories (
   id UUID PRIMARY KEY,
   warehouse_id TEXT NOT NULL,
   medication_id TEXT NOT NULL,
-  brand_id UUID NOT NULL,
+  brand_id UUID,
   blister_change_date DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_medicine_blister_date_history_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id) ON DELETE CASCADE,
@@ -104,23 +104,7 @@ CREATE TABLE IF NOT EXISTS pharma_sheet_warehouse_sheets (
   CONSTRAINT fk_warehouse_sheet_warehouse_id FOREIGN KEY (warehouse_id) REFERENCES pharma_sheet_warehouses (warehouse_id) ON DELETE CASCADE
 );
 
-CREATE OR REPLACE FUNCTION insert_into_pharma_sheet_medicine_brands()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO pharma_sheet_medicine_brands (id, medication_id, trade_id, created_at, updated_at)
-    VALUES (gen_random_uuid(), NEW.medication_id, '-', NOW(), NOW());
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER after_insert_pharma_sheet_medicines
-AFTER INSERT ON pharma_sheet_medicines
-FOR EACH ROW
-EXECUTE FUNCTION insert_into_pharma_sheet_medicine_brands();
-
 -- migrate:down
-DROP TRIGGER IF EXISTS after_insert_pharma_sheet_medicines ON pharma_sheet_medicines;
-DROP FUNCTION IF EXISTS insert_into_pharma_sheet_medicine_brands();
 DROP TABLE IF EXISTS pharma_sheet_warehouse_sheets;
 DROP TABLE IF EXISTS pharma_sheet_medicine_houses;
 DROP TABLE IF EXISTS pharma_sheet_medicine_blister_date_histories;

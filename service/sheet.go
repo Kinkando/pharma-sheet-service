@@ -263,14 +263,9 @@ func (s *sheet) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncM
 	}
 	for _, medicineSheet := range data.BlisterDate.MedicineSheets {
 		date, _ := time.Parse(model.DateLayout, medicineSheet.BlisterDate)
-		var medicineBrandID uuid.UUID
+		var medicineBrandID *uuid.UUID
 		if id, ok := brandID[medicineSheet.MedicationID+"-"+medicineSheet.TradeID]; ok && id != uuid.Nil {
-			medicineBrandID = id
-		} else if id, ok := brandID[medicineSheet.MedicationID+"--"]; ok && id != uuid.Nil {
-			medicineBrandID = id
-		} else {
-			logger.Context(ctx).Errorf("medicine brand not found %s", medicineSheet.TradeID)
-			return echo.NewHTTPError(http.StatusBadRequest, echo.Map{"error": "medicine brand not found"})
+			medicineBrandID = &id
 		}
 
 		_, ok := data.BlisterDate.MedicineData[medicineSheet.ExternalID()]
@@ -506,6 +501,9 @@ func (s *sheet) mappingMedicineBlisterDateSheet(ctx context.Context, sheet *shee
 
 	for _, sheetData := range sheetData {
 		if !sheetData.IsInvalid() && sheetData.WarehouseID == warehouseID {
+			if sheetData.TradeID == "-" {
+				sheetData.TradeID = ""
+			}
 			data.MedicineSheets = append(data.MedicineSheets, sheetData)
 		}
 	}

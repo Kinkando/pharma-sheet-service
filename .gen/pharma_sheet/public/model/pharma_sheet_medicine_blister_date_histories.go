@@ -16,7 +16,7 @@ type PharmaSheetMedicineBlisterDateHistories struct {
 	ID                uuid.UUID `sql:"primary_key"`
 	WarehouseID       string
 	MedicationID      string
-	BrandID           uuid.UUID
+	BrandID           *uuid.UUID
 	BlisterChangeDate time.Time
 	CreatedAt         time.Time
 }

@@ -57,12 +57,12 @@ func (m MedicineHouse) ExternalID() string {
 }
 
 type MedicineBlisterDateHistory struct {
-	ID                uuid.UUID `json:"id"`
-	MedicationID      string    `json:"medicationID,omitempty"`
-	WarehouseID       string    `json:"warehouseID"`
-	BrandID           uuid.UUID `json:"brandID"`
-	TradeID           string    `json:"tradeID"`
-	BlisterChangeDate time.Time `json:"blisterChangeDate"`
+	ID                uuid.UUID  `json:"id"`
+	MedicationID      string     `json:"medicationID,omitempty"`
+	WarehouseID       string     `json:"warehouseID"`
+	BrandID           *uuid.UUID `json:"brandID,omitempty"`
+	TradeID           *string    `json:"tradeID,omitempty"`
+	BlisterChangeDate time.Time  `json:"blisterChangeDate"`
 
 	// JOIN ONLY
 	WarehouseName *string `json:"warehouseName,omitempty"`
@@ -70,7 +70,12 @@ type MedicineBlisterDateHistory struct {
 }
 
 func (m MedicineBlisterDateHistory) ExternalID() string {
-	return m.WarehouseID + "-" + m.MedicationID + "-" + m.TradeID + "-" + m.BlisterChangeDate.Format(time.DateOnly)
+	id := m.WarehouseID + "-" + m.MedicationID
+	if m.TradeID != nil && *m.TradeID != "" {
+		id += "-" + *m.TradeID
+	}
+	id += "-" + m.BlisterChangeDate.Format(time.DateOnly)
+	return id
 }
 
 type MedicineView struct {
@@ -106,7 +111,7 @@ type MedicineBlisterDateHistoryView struct {
 }
 
 type MedicineBrandBlisterDateHistoryView struct {
-	TradeID        string                                      `json:"tradeID"`
+	TradeID        *string                                     `json:"tradeID,omitempty"`
 	TradeName      *string                                     `json:"tradeName,omitempty"`
 	BlisterChanges []MedicineBrandBlisterDateDetailHistoryView `json:"blisterChanges"`
 }
@@ -259,18 +264,18 @@ type MedicineBlisterDateHistoryGroup struct {
 	MedicalName   string                                      `json:"medicalName"`
 	WarehouseID   string                                      `json:"warehouseID"`
 	WarehouseName string                                      `json:"warehouseName"`
-	BrandID       uuid.UUID                                   `json:"brandID"`
-	TradeID       string                                      `json:"tradeID"`
+	BrandID       *uuid.UUID                                  `json:"brandID,omitempty"`
+	TradeID       *string                                     `json:"tradeID,omitempty"`
 	TradeName     *string                                     `json:"tradeName,omitempty"`
 	Histories     []MedicineBrandBlisterDateDetailHistoryView `json:"histories"`
 }
 
 type CreateMedicineBlisterChangeDateHistoryRequest struct {
-	MedicationID      string    `json:"medicationID" validate:"required"`
-	WarehouseID       string    `json:"warehouseID" validate:"required"`
-	BrandID           uuid.UUID `json:"brandID" validate:"required,uuid"`
-	Date              string    `json:"date" validate:"required"`
-	BlisterChangeDate time.Time `json:"-"`
+	MedicationID      string     `json:"medicationID" validate:"required"`
+	WarehouseID       string     `json:"warehouseID" validate:"required"`
+	BrandID           *uuid.UUID `json:"brandID" validate:"omitempty,uuid"`
+	Date              string     `json:"date" validate:"required"`
+	BlisterChangeDate time.Time  `json:"-"`
 }
 
 type DeleteMedicineBlisterChangeDateHistoryRequest struct {
