@@ -249,7 +249,7 @@ type MedicineBlisterDateHistoryGroup struct {
 type CreateMedicineBlisterChangeDateHistoryRequest struct {
 	MedicationID      string    `json:"medicationID" validate:"required"`
 	WarehouseID       string    `json:"warehouseID" validate:"required"`
-	BrandID           uuid.UUID `json:"brandID" validate:"omitempty,uuid"`
+	BrandID           uuid.UUID `json:"brandID" validate:"required,uuid"`
 	Date              string    `json:"date" validate:"required"`
 	BlisterChangeDate time.Time `json:"-"`
 }
