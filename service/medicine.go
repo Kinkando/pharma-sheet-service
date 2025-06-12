@@ -681,7 +681,7 @@ func (s *medicine) imageURL(ctx context.Context, fileID *string) *string {
 	if fileID == nil {
 		return nil
 	}
-	url := s.storage.PublicURL(ctx, *fileID)
+	url := google.PublicURL(*fileID)
 	if s.isSelfHostImage {
 		host := ctx.Value("host").(string)
 		url = host + "/file/" + *fileID

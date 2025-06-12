@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	genmodel "github.com/kinkando/pharma-sheet-service/.gen/pharma_sheet/public/model"
 	"github.com/kinkando/pharma-sheet-service/model"
+	"github.com/kinkando/pharma-sheet-service/pkg/documentgenerator"
 	"github.com/kinkando/pharma-sheet-service/pkg/google"
 	"github.com/kinkando/pharma-sheet-service/pkg/logger"
 	"github.com/kinkando/pharma-sheet-service/pkg/profile"
@@ -31,6 +33,7 @@ const (
 type Sheet interface {
 	SummarizeMedicineFromGoogleSheet(ctx context.Context, req model.GetSyncMedicineMetadataRequest) (model.SyncMedicineMetadata, error)
 	SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncMedicineRequest) error
+	ExportSheet(ctx context.Context, req model.ExportSheetRequest) (io.Reader, error)
 }
 
 type sheet struct {
@@ -288,6 +291,287 @@ func (s *sheet) SyncMedicineFromGoogleSheet(ctx context.Context, req model.SyncM
 	}
 
 	return nil
+}
+
+func (s *sheet) ExportSheet(ctx context.Context, req model.ExportSheetRequest) (io.Reader, error) {
+	file := documentgenerator.NewExcelizeFile()
+	defer file.Close()
+
+	medicines, err := s.medicineRepository.ListMedicinesMaster(ctx)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	medicineBrands, err := s.medicineRepository.ListMedicineBrands(ctx)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	medicineMapping := make(map[string]string)
+	for _, medicine := range medicines {
+		medicineMapping[medicine.MedicationID] = medicine.MedicalName
+	}
+
+	var histories []model.MedicineBlisterDateHistory
+	var houses []model.MedicineHouse
+	for _, warehouseID := range req.WarehouseIDs {
+		if err = s.checkWarehouseManagementRole(ctx, warehouseID, genmodel.PharmaSheetRole_Admin, genmodel.PharmaSheetRole_Editor, genmodel.PharmaSheetRole_Viewer); err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+
+		medicineHouses, err := s.medicineRepository.GetMedicineHouses(ctx, model.FilterMedicineHouse{WarehouseID: warehouseID})
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+		houses = append(houses, medicineHouses...)
+
+		medicineBlisterDateHistories, err := s.medicineRepository.ListMedicineBlisterChangeDateHistory(ctx, model.FilterMedicineBrandBlisterDateHistory{WarehouseID: &warehouseID})
+		if err != nil {
+			logger.Context(ctx).Error(err)
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+		}
+		histories = append(histories, medicineBlisterDateHistories...)
+	}
+
+	err = s.exportSheetMedicineID(ctx, file, medicines)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	err = s.exportSheetMedicineHouse(ctx, file, medicineMapping, houses)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	err = s.exportSheetMedicineBlisterDate(ctx, file, medicineMapping, houses, medicineBrands, histories)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	err = s.exportSheetMedicineBrand(ctx, file, medicineMapping, medicineBrands)
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	_ = file.DeleteDefaultSheet()
+	if err := file.SetAutoWidth(4); err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	data, err := file.WriteToBuffer()
+	if err != nil {
+		logger.Context(ctx).Error(err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	return data, nil
+}
+
+func (s *sheet) exportSheetMedicineID(_ context.Context, file *documentgenerator.Excelize, medicines []model.Medicine) error {
+	if len(medicines) == 0 {
+		return nil
+	}
+
+	data := [][]any{{"Medication ID", "ชื่อสามัญทางยา"}}
+	for _, medicine := range medicines {
+		data = append(data, []any{medicine.MedicationID, medicine.MedicalName})
+	}
+	return file.SetSheetData(medicationSheetName, data, documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true))
+}
+
+func (s *sheet) exportSheetMedicineHouse(_ context.Context, file *documentgenerator.Excelize, medicineMapping map[string]string, medicineHouses []model.MedicineHouse) error {
+	if len(medicineHouses) == 0 || len(medicineMapping) == 0 {
+		return nil
+	}
+
+	data := [][]any{{
+		"ศูนย์",
+		"House_ID",
+		"ตู้",
+		"ชั้น",
+		"ลำดับที่",
+		"บ้านเลขที่ยา",
+		"ชื่อสามัญทางยา",
+		"Medication_ID",
+		"Label ตะกร้า",
+	}}
+
+	currentRow := len(data)
+	for _, medicine := range medicineHouses {
+		currentRow++
+		label := "-"
+		if medicine.Label != nil {
+			label = *medicine.Label
+		}
+		data = append(data, []any{
+			medicine.WarehouseID,
+			fmt.Sprintf(`=CONCATENATE(A%d, "-", H%d)`, currentRow, currentRow),
+			medicine.Locker,
+			medicine.Floor,
+			medicine.No,
+			fmt.Sprintf(`=CONCATENATE(C%d, "-", D%d, "-", E%d)`, currentRow, currentRow, currentRow),
+			medicineMapping[medicine.MedicationID],
+			fmt.Sprintf(`=VLOOKUP(G%d, {%s!B:B, %s!A:A}, 2, FALSE)`, currentRow, medicationSheetName, medicationSheetName),
+			label,
+		})
+	}
+
+	return file.SetSheetData(
+		houseSheetName,
+		data,
+		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
+		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
+		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("G2:G%d", currentRow), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
+	)
+}
+
+func (s *sheet) exportSheetMedicineBlisterDate(_ context.Context, file *documentgenerator.Excelize, medicineMapping map[string]string, medicineHouses []model.MedicineHouse, medicineBrands []model.MedicineBrand, histories []model.MedicineBlisterDateHistory) error {
+	if len(medicineHouses) == 0 || len(medicineBrands) == 0 || len(medicineMapping) == 0 {
+		return nil
+	}
+
+	medicineBrandMapping := make(map[string][]model.MedicineBrand)
+	for _, medicineBrand := range medicineBrands {
+		if _, ok := medicineBrandMapping[medicineBrand.MedicationID]; !ok {
+			medicineBrandMapping[medicineBrand.MedicationID] = []model.MedicineBrand{}
+		}
+		medicineBrandMapping[medicineBrand.MedicationID] = append(medicineBrandMapping[medicineBrand.MedicationID], medicineBrand)
+	}
+
+	historyMapping := make(map[string][]model.MedicineBlisterDateHistory)
+	for _, history := range histories {
+		id := history.WarehouseID + "-" + history.MedicationID
+		if history.TradeID != nil && *history.TradeID != "" {
+			id += "-" + *history.TradeID
+		}
+		if _, ok := historyMapping[id]; !ok {
+			historyMapping[id] = []model.MedicineBlisterDateHistory{}
+		}
+		historyMapping[id] = append(historyMapping[id], history)
+	}
+
+	data := [][]any{{
+		"ศูนย์",
+		"Medication_ID",
+		"House_ID",
+		"ชื่อสามัญทางยา",
+		"ชื่อการค้า",
+		"วันที่เปลี่ยนแผงยา",
+		"TRADENAME_ID",
+	}}
+
+	currentRow := len(data) + 1
+	for _, medicineHouse := range medicineHouses {
+		medicineBrand, ok := medicineBrandMapping[medicineHouse.MedicationID]
+		if !ok {
+			continue
+		}
+		for _, brand := range medicineBrand {
+			tradeName := "-"
+			if brand.TradeName != nil {
+				tradeName = *brand.TradeName
+			}
+			if histories, ok := historyMapping[medicineHouse.WarehouseID+"-"+medicineHouse.MedicationID+"-"+brand.TradeID]; ok && len(histories) > 0 {
+				for _, history := range histories {
+					data = append(data, []any{
+						medicineHouse.WarehouseID,
+						brand.MedicationID,
+						fmt.Sprintf(`=CONCATENATE(A%d, "-", B%d)`, currentRow, currentRow),
+						medicineMapping[brand.MedicationID],
+						tradeName,
+						history.BlisterChangeDate.Format(model.DateLayout),
+						brand.TradeID,
+					})
+					currentRow++
+				}
+				continue
+			}
+			data = append(data, []any{
+				medicineHouse.WarehouseID,
+				brand.MedicationID,
+				fmt.Sprintf(`=CONCATENATE(A%d, "-", B%d)`, currentRow, currentRow),
+				medicineMapping[brand.MedicationID],
+				tradeName,
+				"ไม่มีข้อมูล",
+				brand.TradeID,
+			})
+			currentRow++
+		}
+	}
+
+	return file.SetSheetData(
+		blisterDateSheetName,
+		data,
+		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
+		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
+		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("D2:D%d", currentRow-1), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
+	)
+}
+
+func (s *sheet) exportSheetMedicineBrand(ctx context.Context, file *documentgenerator.Excelize, medicineMapping map[string]string, medicineBrands []model.MedicineBrand) error {
+	if len(medicineBrands) == 0 || len(medicineMapping) == 0 {
+		return nil
+	}
+
+	link := func(fileID *string) string {
+		if fileID == nil || *fileID == "" {
+			return "-"
+		}
+		return google.PublicURL(*fileID)
+	}
+
+	imageFormula := `=IF(%s%d="-", "-", IMAGE(CONCAT("https://drive.google.com/uc?export=view&id=", REGEXEXTRACT(%s%d, "/d/([a-zA-Z0-9_-]+)"))))`
+
+	data := [][]any{{
+		"Medication_ID",
+		"ชื่อสามัญทางยา",
+		"TRADENAME_ID",
+		"ชื่อการค้า",
+		"Link_แผงยา",
+		"ภาพแผงยา",
+		"Link_เม็ดยา",
+		"ภาพเม็ดยา",
+		"Link_กล่องยา",
+		"ภาพกล่องยา",
+	}}
+
+	currentRow := len(data)
+	for _, medicineBrand := range medicineBrands {
+		currentRow++
+		tradeName := "-"
+		if medicineBrand.TradeName != nil {
+			tradeName = *medicineBrand.TradeName
+		}
+		data = append(data, []any{
+			medicineBrand.MedicationID,
+			medicineMapping[medicineBrand.MedicationID],
+			medicineBrand.TradeID,
+			tradeName,
+			link(medicineBrand.BlisterImageURL),
+			fmt.Sprintf(imageFormula, "E", currentRow, "E", currentRow),
+			link(medicineBrand.TabletImageURL),
+			fmt.Sprintf(imageFormula, "G", currentRow, "G", currentRow),
+			link(medicineBrand.BoxImageURL),
+			fmt.Sprintf(imageFormula, "I", currentRow, "I", currentRow),
+		})
+	}
+
+	return file.SetSheetData(
+		brandSheetName,
+		data,
+		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
+		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
+		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("B2:B%d", currentRow), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
+	)
 }
 
 func (s *sheet) checkWarehouseManagementRole(ctx context.Context, warehouseID string, roles ...genmodel.PharmaSheetRole) (err error) {

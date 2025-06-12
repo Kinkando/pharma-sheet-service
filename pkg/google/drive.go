@@ -53,7 +53,6 @@ type Drive interface {
 	Upload(ctx context.Context, directory, fileName string, data []byte) (string, error)
 	UploadMultipart(ctx context.Context, directory string, file *multipart.FileHeader) (string, error)
 	Delete(ctx context.Context, fileID string) error
-	PublicURL(ctx context.Context, fileID string) string
 	MoveFromRoot(ctx context.Context, fileID, folderID string) error
 	GetParentIDByDirectory(ctx context.Context, parentID, directory string) (string, error)
 }
@@ -291,7 +290,7 @@ func (ggd *GoogleDrive) createDirectory(ctx context.Context, parentID, name stri
 	return file.Id, nil
 }
 
-func (ggd *GoogleDrive) PublicURL(ctx context.Context, fileID string) string {
+func PublicURL(fileID string) string {
 	return fmt.Sprintf("https://drive.google.com/file/d/%s/view", fileID)
 }
 
