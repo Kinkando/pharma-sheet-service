@@ -1281,7 +1281,7 @@ func (r *medicine) CreateMedicineBrand(ctx context.Context, req model.CreateMedi
 
 	_, err := r.pgPool.Exec(ctx, sql, args...)
 	if err != nil {
-		logger.Context(ctx).Error(err)
+		logger.Context(ctx).With("request", req).Error(err)
 		return "", err
 	}
 

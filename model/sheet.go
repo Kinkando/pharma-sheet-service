@@ -73,7 +73,7 @@ func (m *MedicineSheet) IsDifferent(req Medicine) bool {
 }
 
 func (m *MedicineSheet) IsInvalid() bool {
-	return m.MedicationID == "" || m.MedicalName == ""
+	return m.MedicationID == "" || m.MedicalName == "" || m.MedicationID == "#N/A"
 }
 
 func (m *MedicineSheet) ExternalID() string {
@@ -129,7 +129,7 @@ func (m *MedicineBrandSheet) IsInvalid() bool {
 		m.BoxImageURL = ""
 	}
 	m.TradeName = strings.TrimSpace(strings.ReplaceAll(m.TradeName, "-", ""))
-	return m.MedicationID == "" || m.TradeID == "" || (m.TradeName == "" && m.BlisterImageURL == "" && m.TabletImageURL == "" && m.BoxImageURL == "")
+	return m.MedicationID == "" || m.TradeID == "" || (m.TradeName == "" && m.BlisterImageURL == "" && m.TabletImageURL == "" && m.BoxImageURL == "") || m.MedicationID == "#N/A"
 }
 
 func (m *MedicineBrandSheet) ExternalID() string {
@@ -180,7 +180,7 @@ func (m *MedicineHouseSheet) IsDifferent(req MedicineHouse) bool {
 
 func (m *MedicineHouseSheet) IsInvalid() bool {
 	return m.WarehouseID == "" || m.HouseID == "" || m.MedicationID == "" || m.MedicalName == "" ||
-		m.Locker == "" || m.Floor() <= 0 || m.No() <= 0 || m.Address == ""
+		m.Locker == "" || m.Floor() <= 0 || m.No() <= 0 || m.Address == "" || m.MedicationID == "#N/A"
 }
 
 func (m *MedicineHouseSheet) ExternalID() string {
@@ -215,7 +215,7 @@ func (m *MedicineBlisterDateSheet) IsDifferent(req MedicineBlisterDateHistory) b
 func (m *MedicineBlisterDateSheet) IsInvalid() bool {
 	date, _ := time.Parse(DateLayout, m.BlisterDate)
 	return m.MedicationID == "" || m.WarehouseID == "" ||
-		m.HouseID == "" || m.TradeID == "" || date.IsZero()
+		m.HouseID == "" || m.TradeID == "" || date.IsZero() || m.MedicationID == "#N/A"
 }
 
 func (m *MedicineBlisterDateSheet) ExternalID() string {
@@ -226,4 +226,8 @@ func (m *MedicineBlisterDateSheet) ExternalID() string {
 	}
 	id += "-" + date.Format(time.DateOnly)
 	return id
+}
+
+type ExportSheetRequest struct {
+	WarehouseIDs []string `json:"warehouseIDs" validate:"required"`
 }
