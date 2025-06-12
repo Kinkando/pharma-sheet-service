@@ -20,6 +20,7 @@ const (
 	delimiterReplacer   = "${DELIMITER}"
 	newLineReplacer     = "${NEW_LINE}"
 	doubleQuoteReplacer = "${DOUBLE_QUOTE}"
+	defaultFontSize     = 14.0
 )
 
 type InitializeExcelizeOption struct {
@@ -98,6 +99,18 @@ func (e *Excelize) SetSheetData(sheetName string, data [][]any, options ...Excel
 		}
 	}
 
+	styleID, err := e.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Size: defaultFontSize,
+		},
+		Alignment: &excelize.Alignment{
+			WrapText: true,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("document generator: excelize: SetSheetData: failed to create style: %w", err)
+	}
+
 	// iterate on data (like table) and set sheet data
 	for r := range data {
 		for c, element := range data[r] {
@@ -108,9 +121,10 @@ func (e *Excelize) SetSheetData(sheetName string, data [][]any, options ...Excel
 
 			cell := fmt.Sprintf("%s%d", columnName, r+firstRow)
 
+			text, ok := element.(string)
 			cellMode := opt.CellMode
 			if cellMode == CellModeFormula {
-				if formula, ok := element.(string); !ok || !strings.HasPrefix(formula, "=") {
+				if !ok || !strings.HasPrefix(text, "=") {
 					cellMode = CellModeValue
 				}
 			}
@@ -130,6 +144,70 @@ func (e *Excelize) SetSheetData(sheetName string, data [][]any, options ...Excel
 					return err
 				}
 			}
+
+			if ok && (strings.HasPrefix(text, "https://") || strings.HasPrefix(text, "http://")) {
+				opt := excelize.HyperlinkOpts{
+					Display: &text,
+					Tooltip: &text,
+				}
+				if err = e.SetCellHyperLink(sheetName, cell, text, "External", opt); err != nil {
+					return fmt.Errorf("document generator: excelize: SetSheetData: failed to set hyperlink for %s: %w", cell, err)
+				}
+			}
+
+			if err = e.SetCellStyle(sheetName, cell, cell, styleID); err != nil {
+				return fmt.Errorf("document generator: excelize: SetSheetData: failed to set cell style for %s: %w", cell, err)
+			}
+		}
+	}
+
+	if opt.IsIncludeHeader && len(data) > 0 {
+		// Define the border properties
+		headerBorderStyle := []excelize.Border{
+			{Type: "left", Color: "#000000", Style: 1},   // Thin black left border
+			{Type: "top", Color: "#000000", Style: 1},    // Thin black top border
+			{Type: "right", Color: "#000000", Style: 1},  // Thin black right border
+			{Type: "bottom", Color: "#000000", Style: 1}, // Thin black bottom border
+		}
+
+		// Define the font properties (bold)
+		headerFontStyle := &excelize.Font{
+			Size: defaultFontSize,
+			Bold: true,
+		}
+
+		// Define the alignment (optional, but good for headers)
+		headerAlignmentStyle := &excelize.Alignment{
+			Horizontal: "center",
+			Vertical:   "center",
+		}
+
+		// Create the header style using NewStyle
+		headerStyleID, err := e.NewStyle(&excelize.Style{
+			Border:    headerBorderStyle,
+			Font:      headerFontStyle,
+			Alignment: headerAlignmentStyle,
+		})
+		if err != nil {
+			return err
+		}
+
+		// Apply the header style to the current cell
+		lastCol, _ := excelize.ColumnNumberToName(len(data[0]) + firstCol - 1)
+		firstColumn := fmt.Sprintf("%s%d", opt.FirstColumn, firstRow)
+		lastColumn := fmt.Sprintf("%s%d", lastCol, firstRow)
+		if err := e.SetCellStyle(sheetName, firstColumn, lastColumn, headerStyleID); err != nil {
+			return err
+		}
+	}
+
+	for i, width := range opt.ColumnWidths {
+		columnName, err := excelize.ColumnNumberToName(i + firstCol)
+		if err != nil {
+			return err
+		}
+		if err = e.SetColWidth(sheetName, columnName, columnName, width); err != nil {
+			return err
 		}
 	}
 

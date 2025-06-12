@@ -363,11 +363,6 @@ func (s *sheet) ExportSheet(ctx context.Context, req model.ExportSheetRequest) (
 	}
 
 	_ = file.DeleteDefaultSheet()
-	if err := file.SetAutoWidth(4); err != nil {
-		logger.Context(ctx).Error(err)
-		return nil, echo.NewHTTPError(http.StatusInternalServerError, echo.Map{"error": err.Error()})
-	}
-
 	data, err := file.WriteToBuffer()
 	if err != nil {
 		logger.Context(ctx).Error(err)
@@ -387,7 +382,13 @@ func (s *sheet) exportSheetMedicineID(_ context.Context, file *documentgenerator
 		data = append(data, []any{medicine.MedicationID, medicine.MedicalName})
 	}
 
-	err := file.SetSheetData(medicationSheetName, data, documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true))
+	err := file.SetSheetData(
+		medicationSheetName,
+		data,
+		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
+		documentgenerator.WithExcelizeSetSheetIncludeHeaders(true),
+		documentgenerator.WithExcelizeSetSheetDataColumnWidths([]float64{20, 160}),
+	)
 	if err != nil {
 		return err
 	}
@@ -437,6 +438,8 @@ func (s *sheet) exportSheetMedicineHouse(_ context.Context, file *documentgenera
 		houseSheetName,
 		data,
 		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
+		documentgenerator.WithExcelizeSetSheetIncludeHeaders(true),
+		documentgenerator.WithExcelizeSetSheetDataColumnWidths([]float64{10, 20, 10, 10, 15, 20, 100, 20, 50}),
 		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
 		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("G2:G%d", currentRow), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
 	)
@@ -526,6 +529,8 @@ func (s *sheet) exportSheetMedicineBlisterDate(_ context.Context, file *document
 		blisterDateSheetName,
 		data,
 		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
+		documentgenerator.WithExcelizeSetSheetIncludeHeaders(true),
+		documentgenerator.WithExcelizeSetSheetDataColumnWidths([]float64{10, 20, 20, 80, 80, 25, 25}),
 		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
 		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("D2:D%d", currentRow-1), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
 	)
@@ -589,6 +594,8 @@ func (s *sheet) exportSheetMedicineBrand(_ context.Context, file *documentgenera
 		brandSheetName,
 		data,
 		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
+		documentgenerator.WithExcelizeSetSheetIncludeHeaders(true),
+		documentgenerator.WithExcelizeSetSheetDataColumnWidths([]float64{20, 60, 25, 60, 30, 30, 30, 30, 30, 30}),
 		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
 		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("B2:B%d", currentRow), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
 	)

@@ -17,6 +17,18 @@ func (essdo excelizeSetSheetDataOptionFunc) Apply(essd *ExcelizeSetSheetData) {
 	essdo(essd)
 }
 
+func WithExcelizeSetSheetDataColumnWidths(columnWidths []float64) ExcelizeSetSheetDataOption {
+	return excelizeSetSheetDataOptionFunc(func(essd *ExcelizeSetSheetData) {
+		essd.ColumnWidths = columnWidths
+	})
+}
+
+func WithExcelizeSetSheetIncludeHeaders(isIncludeHeader bool) ExcelizeSetSheetDataOption {
+	return excelizeSetSheetDataOptionFunc(func(essd *ExcelizeSetSheetData) {
+		essd.IsIncludeHeader = isIncludeHeader
+	})
+}
+
 func WithExcelizeSetSheetDataDropdown(dropdown DropdownOption) ExcelizeSetSheetDataOption {
 	return excelizeSetSheetDataOptionFunc(func(essd *ExcelizeSetSheetData) {
 		essd.Dropdown = &dropdown
@@ -89,6 +101,12 @@ type ExcelizeSetSheetData struct {
 
 	// Dropdown data validation
 	Dropdown *DropdownOption
+
+	// IsIncludeHeader indicates whether to include headers in the sheet data
+	IsIncludeHeader bool
+
+	// ColumnWidths defines the widths of columns in the sheet
+	ColumnWidths []float64
 }
 
 type DropdownOption struct {
