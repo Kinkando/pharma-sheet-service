@@ -20,6 +20,7 @@ import (
 	"github.com/kinkando/pharma-sheet-service/repository"
 	"github.com/labstack/echo/v4"
 	"github.com/sourcegraph/conc/pool"
+	"github.com/xuri/excelize/v2"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -385,7 +386,14 @@ func (s *sheet) exportSheetMedicineID(_ context.Context, file *documentgenerator
 	for _, medicine := range medicines {
 		data = append(data, []any{medicine.MedicationID, medicine.MedicalName})
 	}
-	return file.SetSheetData(medicationSheetName, data, documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true))
+
+	err := file.SetSheetData(medicationSheetName, data, documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true))
+	if err != nil {
+		return err
+	}
+
+	lastColumn, _ := excelize.ColumnNumberToName(len(data[0]))
+	return file.AutoFilter(medicationSheetName, fmt.Sprintf("A1:%s%d", lastColumn, len(data)), nil)
 }
 
 func (s *sheet) exportSheetMedicineHouse(_ context.Context, file *documentgenerator.Excelize, medicineMapping map[string]string, medicineHouses []model.MedicineHouse) error {
@@ -425,13 +433,19 @@ func (s *sheet) exportSheetMedicineHouse(_ context.Context, file *documentgenera
 		})
 	}
 
-	return file.SetSheetData(
+	err := file.SetSheetData(
 		houseSheetName,
 		data,
 		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
 		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
 		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("G2:G%d", currentRow), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
 	)
+	if err != nil {
+		return err
+	}
+
+	lastColumn, _ := excelize.ColumnNumberToName(len(data[0]))
+	return file.AutoFilter(houseSheetName, fmt.Sprintf("A1:%s%d", lastColumn, len(data)), nil)
 }
 
 func (s *sheet) exportSheetMedicineBlisterDate(_ context.Context, file *documentgenerator.Excelize, medicineMapping map[string]string, medicineHouses []model.MedicineHouse, medicineBrands []model.MedicineBrand, histories []model.MedicineBlisterDateHistory) error {
@@ -508,16 +522,22 @@ func (s *sheet) exportSheetMedicineBlisterDate(_ context.Context, file *document
 		}
 	}
 
-	return file.SetSheetData(
+	err := file.SetSheetData(
 		blisterDateSheetName,
 		data,
 		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
 		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
 		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("D2:D%d", currentRow-1), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
 	)
+	if err != nil {
+		return err
+	}
+
+	lastColumn, _ := excelize.ColumnNumberToName(len(data[0]))
+	return file.AutoFilter(blisterDateSheetName, fmt.Sprintf("A1:%s%d", lastColumn, len(data)), nil)
 }
 
-func (s *sheet) exportSheetMedicineBrand(ctx context.Context, file *documentgenerator.Excelize, medicineMapping map[string]string, medicineBrands []model.MedicineBrand) error {
+func (s *sheet) exportSheetMedicineBrand(_ context.Context, file *documentgenerator.Excelize, medicineMapping map[string]string, medicineBrands []model.MedicineBrand) error {
 	if len(medicineBrands) == 0 || len(medicineMapping) == 0 {
 		return nil
 	}
@@ -565,13 +585,19 @@ func (s *sheet) exportSheetMedicineBrand(ctx context.Context, file *documentgene
 		})
 	}
 
-	return file.SetSheetData(
+	err := file.SetSheetData(
 		brandSheetName,
 		data,
 		documentgenerator.WithExcelizeSetSheetDataIsNewSheet(true),
 		documentgenerator.WithExcelizeSetSheetDataCell(documentgenerator.CellModeFormula),
 		documentgenerator.WithExcelizeSetSheetDataDropdown(documentgenerator.DropdownOption{Range: fmt.Sprintf("B2:B%d", currentRow), Ref: fmt.Sprintf("%s!$B$2:$B$%d", medicationSheetName, len(medicineMapping)+1)}),
 	)
+	if err != nil {
+		return err
+	}
+
+	lastColumn, _ := excelize.ColumnNumberToName(len(data[0]))
+	return file.AutoFilter(brandSheetName, fmt.Sprintf("A1:%s%d", lastColumn, len(data)), nil)
 }
 
 func (s *sheet) checkWarehouseManagementRole(ctx context.Context, warehouseID string, roles ...genmodel.PharmaSheetRole) (err error) {
