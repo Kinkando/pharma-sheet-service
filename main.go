@@ -2,9 +2,12 @@ package main
 
 import (
 	"log"
+	nethttp "net/http"
+	"strings"
 	"time"
 	_ "time/tzdata"
 
+	"github.com/go-co-op/gocron"
 	"github.com/go-playground/validator/v10"
 	"github.com/kinkando/pharma-sheet-service/config"
 	"github.com/kinkando/pharma-sheet-service/http"
@@ -105,6 +108,28 @@ func main() {
 	http.NewMedicineHandler(httpServer.Routers(), validate, medicineService)
 	http.NewSheetHandler(httpServer.Routers(), validate, sheetService)
 
+	if !cfg.App.DisabledPingSelfHost {
+		go pingHealthCheck(cfg.App.Host)
+	}
+
 	httpServer.ListenAndServe()
 	httpServer.GracefulShutdown()
+}
+
+func pingHealthCheck(host string) {
+	tz, _ := time.LoadLocation("Asia/Bangkok")
+	g := gocron.NewScheduler(tz)
+	url := strings.TrimSuffix(host, "/") + "/livez"
+
+	g.Cron("* * * * *").Do(func() {
+		res, err := nethttp.Get(url)
+		if err != nil {
+			logger.Error(err)
+		}
+		defer res.Body.Close()
+
+		logger.Infof("cronjob health check '%s': %d", url, res.StatusCode)
+	})
+
+	g.StartAsync()
 }
